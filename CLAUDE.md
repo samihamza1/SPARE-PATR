@@ -11,7 +11,8 @@ Never hardcode a currency, tax rate or country rule. If a task needs one, ask.
 
 ## Status
 
-Pre-code. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
+Sprint 1 (platform foundation) done. Scope, data model and scenarios: docs/BRIEF.md
+(not yet in the repo). Decisions: docs/adr/.
 
 ## Stack (confirm each via a short ADR in Sprint 1 before locking)
 
@@ -76,6 +77,10 @@ marketing CRM, VIN decoding, e-invoicing connectors.
 - Do not weaken an invariant above without explicit approval.
 - Talk to me in Arabic. Code, comments, commits and docs in English.
 
-## Commands (fill in after scaffold)
+## Commands
 
-pnpm dev | pnpm test | pnpm lint | pnpm typecheck | pnpm db:migrate
+- Setup: `pnpm install`, `cp .env.example .env`, `pnpm db:up`, `pnpm db:migrate`
+- `pnpm dev` | `pnpm build`
+- `pnpm lint` | `pnpm format:check` | `pnpm typecheck`
+- `pnpm test` = `pnpm test:unit` + `pnpm test:db` (needs PostgreSQL; recreates autoparts_test)
+- `pnpm db:migrate` | `pnpm db:new <name>` | `pnpm db:codegen` (run after every migration, commit the output)
