@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Format, lint, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm --filter @autoparts/pos --filter @autoparts/backoffice build
+
+  test:
+    name: Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      # Throwaway credentials for the ephemeral CI database only.
+      ADMIN_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      OWNER_DATABASE_URL: postgres://autoparts_owner:ci_owner_password@localhost:5432/autoparts
+      APP_DATABASE_URL: postgres://autoparts_app:ci_app_password@localhost:5432/autoparts
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Bootstrap roles and database
+        run: pnpm db:bootstrap
+      - name: Migrate (twice, the second run must be a no-op)
+        run: |
+          pnpm db:migrate
+          pnpm db:migrate | tee migrate.log
+          grep -q "database is up to date" migrate.log
+      - name: Generated Kysely types match the schema
+        run: pnpm db:codegen:verify
+      - name: Tests (includes the RLS tenancy guard)
+        run: pnpm test
