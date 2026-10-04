@@ -1,4 +1,0 @@
-pnpm-lock.yaml
-dist/
-coverage/
-db/src/types.generated.ts
