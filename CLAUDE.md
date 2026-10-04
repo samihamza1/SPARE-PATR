@@ -83,6 +83,8 @@ marketing CRM, VIN decoding, e-invoicing connectors.
 - `pnpm dev` | `pnpm build`
 - `pnpm lint` | `pnpm format:check` | `pnpm typecheck`
 - `pnpm test` = `pnpm test:unit` + `pnpm test:db` (needs PostgreSQL; recreates autoparts_test)
+- `pnpm test:e2e`: Playwright journey against real API + DB + back office (set
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a pre-installed Chromium)
 - `pnpm db:migrate` | `pnpm db:new <name>` | `pnpm db:codegen` (run after every migration, commit the output)
 - `pnpm tenant:create --slug … --currency … --rounding … --negative-stock allow|deny …`
   provisions a tenant (owner role; every value required, see apps/api/src/cli/tenant-create.ts)

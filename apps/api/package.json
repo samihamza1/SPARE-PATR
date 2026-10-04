@@ -30,5 +30,8 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.15",
     "vitest": "^5.0.3"
+  },
+  "exports": {
+    "./provisioning": "./src/provisioning.ts"
   }
 }

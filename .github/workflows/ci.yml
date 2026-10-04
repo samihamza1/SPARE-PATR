@@ -75,3 +75,51 @@ jobs:
       - name: Generated Kysely types match the schema
         run: pnpm --filter @autoparts/db codegen:check
       - run: pnpm test:db
+
+  e2e:
+    name: End-to-end (Playwright, PostgreSQL 18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # Throwaway credentials for the CI service container only.
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      AUTOPARTS_OWNER_PASSWORD: ci_owner_pw
+      AUTOPARTS_APP_PASSWORD: ci_app_pw
+      TEST_DATABASE_URL: postgres://autoparts_owner:ci_owner_pw@localhost:5432/autoparts_test?sslmode=disable
+      TEST_APP_DATABASE_URL: postgres://autoparts_app:ci_app_pw@localhost:5432/autoparts_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create roles and databases
+        run: db/bootstrap/00-roles.sh
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @autoparts/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Keep the report when it fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7

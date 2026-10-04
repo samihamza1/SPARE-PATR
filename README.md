@@ -36,6 +36,7 @@ pnpm dev                  # API :3000, POS :5173, back office :5174
 | `pnpm typecheck`                  | `tsc` in every package                                                                                                  |
 | `pnpm test`                       | `test:unit` + `test:db`                                                                                                 |
 | `pnpm test:db`                    | Recreates `autoparts_test`, checks every migration down and up, runs RLS tests and API integration tests                |
+| `pnpm test:e2e`                   | Playwright end-to-end journey (API + DB + back office in Chromium)                                                      |
 | `pnpm db:migrate`                 | Applies pending migrations to the dev database                                                                          |
 | `pnpm db:new <name>`              | Creates `db/migrations/<timestamp>_<name>.sql`                                                                          |
 | `pnpm db:codegen`                 | Regenerates Kysely types; run after every migration and commit                                                          |
