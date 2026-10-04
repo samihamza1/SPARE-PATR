@@ -15,11 +15,12 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm test:unit && pnpm test:db",
     "test:unit": "pnpm -r --filter \"!@autoparts/db\" test",
-    "test:db": "pnpm --filter @autoparts/db test",
+    "test:db": "pnpm --filter @autoparts/db test && pnpm --filter @autoparts/api test:integration",
     "db:up": "docker compose up -d --wait postgres",
     "db:migrate": "pnpm --filter @autoparts/db migrate",
     "db:new": "pnpm --filter @autoparts/db new",
-    "db:codegen": "pnpm --filter @autoparts/db codegen"
+    "db:codegen": "pnpm --filter @autoparts/db codegen",
+    "tenant:create": "pnpm --filter @autoparts/api tenant:create"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

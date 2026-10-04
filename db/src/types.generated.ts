@@ -134,6 +134,7 @@ export interface Users {
   failed_login_count: Generated<number>;
   id: string;
   last_login_at: Timestamp | null;
+  locale: string | null;
   locked_until: Timestamp | null;
   password_changed_at: Timestamp | null;
   password_hash: string | null;

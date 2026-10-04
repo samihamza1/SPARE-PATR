@@ -29,17 +29,18 @@ pnpm dev                  # API :3000, POS :5173, back office :5174
 
 ## Commands
 
-| Command                           | Does                                                                           |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| `pnpm dev`                        | Runs the API and both web apps                                                 |
-| `pnpm lint` / `pnpm format:check` | ESLint (incl. money and i18n guard rails) / Prettier                           |
-| `pnpm typecheck`                  | `tsc` in every package                                                         |
-| `pnpm test`                       | `test:unit` + `test:db`                                                        |
-| `pnpm test:db`                    | Recreates `autoparts_test`, checks every migration down and up, runs RLS tests |
-| `pnpm db:migrate`                 | Applies pending migrations to the dev database                                 |
-| `pnpm db:new <name>`              | Creates `db/migrations/<timestamp>_<name>.sql`                                 |
-| `pnpm db:codegen`                 | Regenerates Kysely types; run after every migration and commit                 |
-| `pnpm build`                      | Builds the API (tsup) and the web apps (Vite)                                  |
+| Command                           | Does                                                                                                                    |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                        | Runs the API and both web apps                                                                                          |
+| `pnpm lint` / `pnpm format:check` | ESLint (incl. money and i18n guard rails) / Prettier                                                                    |
+| `pnpm typecheck`                  | `tsc` in every package                                                                                                  |
+| `pnpm test`                       | `test:unit` + `test:db`                                                                                                 |
+| `pnpm test:db`                    | Recreates `autoparts_test`, checks every migration down and up, runs RLS tests and API integration tests                |
+| `pnpm db:migrate`                 | Applies pending migrations to the dev database                                                                          |
+| `pnpm db:new <name>`              | Creates `db/migrations/<timestamp>_<name>.sql`                                                                          |
+| `pnpm db:codegen`                 | Regenerates Kysely types; run after every migration and commit                                                          |
+| `pnpm tenant:create --slug … `    | Provisions a tenant with its functional currency, system roles and owner user (see `apps/api/src/cli/tenant-create.ts`) |
+| `pnpm build`                      | Builds the API (tsup) and the web apps (Vite)                                                                           |
 
 ## Database roles
 

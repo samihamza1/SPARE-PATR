@@ -11,7 +11,14 @@ const app = buildServer(
     checkDatabase: async () => {
       await sql`SELECT 1`.execute(db);
     },
+    platform: {
+      db,
+      allowedOrigins: config.allowedOrigins,
+      cookieSecure: config.cookieSecure,
+      now: () => new Date(),
+    },
   },
+  // Behind a reverse proxy, set trustProxy so request.ip (rate limits, audit) is the client.
   { logger: true },
 );
 app.addHook('onClose', () => db.destroy());

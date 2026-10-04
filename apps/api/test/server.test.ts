@@ -38,7 +38,25 @@ describe('loadConfig', () => {
       databaseUrl: 'postgres://app@db/autoparts',
       host: '127.0.0.1',
       port: 3000,
+      allowedOrigins: [],
+      cookieSecure: true,
     });
+  });
+
+  it('parses allowed origins and the cookie flag', () => {
+    expect(
+      loadConfig({
+        APP_DATABASE_URL: 'x',
+        ALLOWED_ORIGINS: 'http://localhost:5173, https://bo.example.com',
+        COOKIE_SECURE: 'false',
+      }),
+    ).toMatchObject({
+      allowedOrigins: ['http://localhost:5173', 'https://bo.example.com'],
+      cookieSecure: false,
+    });
+    expect(() =>
+      loadConfig({ APP_DATABASE_URL: 'x', ALLOWED_ORIGINS: 'http://a.com/path' }),
+    ).toThrow(/ALLOWED_ORIGINS/);
   });
 
   it('fails fast on missing or invalid settings', () => {

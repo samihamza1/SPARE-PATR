@@ -36,7 +36,7 @@ jobs:
         run: scripts/check-migrations-immutable.sh "origin/${{ github.base_ref }}"
 
   db:
-    name: Migrations and RLS tests (PostgreSQL 18)
+    name: Migrations, RLS and API integration tests (PostgreSQL 18)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:

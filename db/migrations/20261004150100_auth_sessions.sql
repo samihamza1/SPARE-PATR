@@ -7,7 +7,9 @@ ALTER TABLE users
   ADD COLUMN last_login_at timestamptz,
   ADD COLUMN password_changed_at timestamptz,
   -- Supervisor/offline PIN verifier (Argon2). Used from the POS phase on.
-  ADD COLUMN pin_hash text;
+  ADD COLUMN pin_hash text,
+  -- UI language preference; NULL means the tenant default.
+  ADD COLUMN locale text CHECK (locale ~ '^[a-z]{2,3}(-[A-Z]{2})?$');
 
 -- Server-side sessions. The cookie carries <tenant_id>.<id>.<secret>; only a SHA-256 of
 -- the 32-byte secret is stored. Idle expiry is computed from last_seen_at and the tenant
@@ -46,6 +48,7 @@ GRANT UPDATE (last_seen_at, revoked_at, revoked_reason) ON sessions TO autoparts
 
 DROP TABLE sessions;
 ALTER TABLE users
+  DROP COLUMN locale,
   DROP COLUMN pin_hash,
   DROP COLUMN password_changed_at,
   DROP COLUMN last_login_at,

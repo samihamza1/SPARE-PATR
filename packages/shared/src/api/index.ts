@@ -21,6 +21,8 @@ export const ERROR_CODES = [
   'request.rate_limited',
   'resource.not_found',
   'resource.conflict',
+  // Would leave the tenant with no active user able to manage users and roles.
+  'users.last_admin',
   'device.invalid_code',
   'server.error',
 ] as const;
@@ -145,7 +147,8 @@ export const settingsResponseSchema = z.object({
   defaultLocale: z.string(),
   timezone: z.string(),
   functionalCurrency: currencyCodeSchema,
-  settings: tenantSettingsSchema,
+  /** null when stored settings are incomplete (tenant must finish setup). */
+  settings: tenantSettingsSchema.nullable(),
 });
 
 export const updateSettingsSchema = z
