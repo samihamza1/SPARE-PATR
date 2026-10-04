@@ -11,8 +11,8 @@ Never hardcode a currency, tax rate or country rule. If a task needs one, ask.
 
 ## Status
 
-Sprint 1 (platform foundation) done. Scope, data model and scenarios: docs/BRIEF.md
-(not yet in the repo). Decisions: docs/adr/.
+Sprint 1 (platform foundation) done; Sprint 2 (auth, roles, settings, devices) in
+progress. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
 
 ## Stack (confirm each via a short ADR in Sprint 1 before locking)
 
@@ -84,3 +84,5 @@ marketing CRM, VIN decoding, e-invoicing connectors.
 - `pnpm lint` | `pnpm format:check` | `pnpm typecheck`
 - `pnpm test` = `pnpm test:unit` + `pnpm test:db` (needs PostgreSQL; recreates autoparts_test)
 - `pnpm db:migrate` | `pnpm db:new <name>` | `pnpm db:codegen` (run after every migration, commit the output)
+- `pnpm tenant:create --slug … --currency … --rounding … --negative-stock allow|deny …`
+  provisions a tenant (owner role; every value required, see apps/api/src/cli/tenant-create.ts)
