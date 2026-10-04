@@ -21,6 +21,8 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
+export type Numeric = ColumnType<string, number | string, number | string>;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AuditLog {
@@ -39,6 +41,22 @@ export interface AuditLog {
   tenant_id: string;
 }
 
+export interface Devices {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  credential_hash: Buffer | null;
+  enrolled_at: Timestamp | null;
+  enrollment_code_hash: Buffer | null;
+  enrollment_expires_at: Timestamp | null;
+  id: string;
+  last_seen_at: Timestamp | null;
+  name: string;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Roles {
   archived_at: Timestamp | null;
   code: string;
@@ -49,6 +67,39 @@ export interface Roles {
   permissions: Generated<string[]>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
+}
+
+export interface Sessions {
+  created_at: Generated<Timestamp>;
+  device_id: string | null;
+  expires_at: Timestamp;
+  id: string;
+  ip: string | null;
+  last_seen_at: Generated<Timestamp>;
+  revoked_at: Timestamp | null;
+  revoked_reason: string | null;
+  secret_hash: Buffer;
+  tenant_id: string;
+  user_agent: string | null;
+  user_id: string;
+}
+
+export interface TenantCurrencies {
+  cash_increment: Numeric | null;
+  code: string;
+  created_at: Generated<Timestamp>;
+  id: string;
+  is_active: Generated<boolean>;
+  minor_units: number;
+  sort_order: Generated<number>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface TenantDirectory {
+  archived: boolean;
+  slug: string;
+  tenant_id: string;
 }
 
 export interface Tenants {
@@ -80,8 +131,13 @@ export interface Users {
   created_at: Generated<Timestamp>;
   display_name: string;
   email: string | null;
+  failed_login_count: Generated<number>;
   id: string;
+  last_login_at: Timestamp | null;
+  locked_until: Timestamp | null;
+  password_changed_at: Timestamp | null;
   password_hash: string | null;
+  pin_hash: string | null;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
   username: string;
@@ -89,7 +145,11 @@ export interface Users {
 
 export interface DB {
   audit_log: AuditLog;
+  devices: Devices;
   roles: Roles;
+  sessions: Sessions;
+  tenant_currencies: TenantCurrencies;
+  tenant_directory: TenantDirectory;
   tenants: Tenants;
   user_roles: UserRoles;
   users: Users;

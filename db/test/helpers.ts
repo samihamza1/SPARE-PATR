@@ -22,20 +22,27 @@ export async function createTenant(
   overrides: Partial<Insertable<Tenants>> = {},
 ): Promise<string> {
   const id = overrides.id ?? newId();
-  await withTenant(db, id, (trx) =>
-    trx
+  const functionalCurrency = overrides.functional_currency ?? 'AAA';
+  await withTenant(db, id, async (trx) => {
+    await trx
       .insertInto('tenants')
       .values({
         id,
         slug: `t-${id.slice(-12)}`,
         name: 'Test tenant',
-        functional_currency: 'AAA',
+        functional_currency: functionalCurrency,
         timezone: 'UTC',
         default_locale: 'ar',
         ...overrides,
       })
-      .execute(),
-  );
+      .execute();
+    // The functional currency must exist as an active tenant currency (checked at commit).
+    // Neutral test data: placeholder code and minor units, not a business rule.
+    await trx
+      .insertInto('tenant_currencies')
+      .values({ id: newId(), tenant_id: id, code: functionalCurrency, minor_units: 2 })
+      .execute();
+  });
   return id;
 }
 

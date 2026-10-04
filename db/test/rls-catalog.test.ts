@@ -12,7 +12,11 @@ type Executor = Kysely<DB>;
  * forced RLS, or be listed here explicitly as global. This test fails for any table that
  * is neither, so a forgotten policy cannot reach production.
  */
-const GLOBAL_TABLES = new Set(['schema_migrations']);
+const GLOBAL_TABLES = new Set([
+  'schema_migrations',
+  // slug -> tenant id for login; unreadable by the app role (ADR 0008).
+  'tenant_directory',
+]);
 
 /** Invariant 3: the app role may never UPDATE or DELETE these (journal/stock tables join later). */
 const APPEND_ONLY_TABLES = ['audit_log'];
@@ -167,6 +171,20 @@ async function viewsWithoutSecurityInvoker(exec: Executor = db): Promise<string[
   return rows.map((r) => r.view);
 }
 
+/**
+ * SECURITY DEFINER functions run with the owner's rights; without a pinned search_path a
+ * caller could shadow tables or operators with objects of its own.
+ */
+async function definersWithoutSearchPath(exec: Executor = db): Promise<string[]> {
+  const { rows } = await sql<{ fn: string }>`
+    SELECT p.oid::regprocedure::text AS fn
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.prosecdef AND n.nspname = 'public'
+      AND NOT coalesce(EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search\\_path=%'), false)
+    ORDER BY 1`.execute(exec);
+  return rows.map((r) => r.fn);
+}
+
 describe('tenant isolation catalog (invariant 4)', () => {
   it('finds the expected tables (sanity check for the queries below)', async () => {
     const names = (await userTables()).map((t) => t.table);
@@ -214,6 +232,10 @@ describe('tenant isolation catalog (invariant 4)', () => {
 
   it('creates every view with security_invoker', async () => {
     expect(await viewsWithoutSecurityInvoker()).toEqual([]);
+  });
+
+  it('pins search_path on every SECURITY DEFINER function', async () => {
+    expect(await definersWithoutSearchPath()).toEqual([]);
   });
 });
 
@@ -291,6 +313,15 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
         foreignKeysWithoutTenant,
       ),
     ).toEqual(['guard_probe.guard_probe_user_fk']);
+  });
+
+  it('flags a SECURITY DEFINER function without a pinned search_path', async () => {
+    expect(
+      await probe(
+        'CREATE FUNCTION guard_probe_fn() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$;',
+        definersWithoutSearchPath,
+      ),
+    ).toEqual(['guard_probe_fn()']);
   });
 
   it('flags a view without security_invoker, and accepts one with it', async () => {
