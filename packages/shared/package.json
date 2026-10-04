@@ -1,0 +1,19 @@
+{
+  "name": "@autoparts/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./money": "./src/money/index.ts",
+    "./ids": "./src/ids.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "uuidv7": "^1.2.1",
+    "zod": "^4.6.5"
+  }
+}

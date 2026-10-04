@@ -1,0 +1,24 @@
+{
+  "name": "@autoparts/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "bootstrap": "tsx src/cli/bootstrap.ts",
+    "migrate": "tsx src/cli/migrate.ts",
+    "reset": "tsx src/cli/reset.ts",
+    "codegen": "kysely-codegen --dialect postgres --url env(OWNER_DATABASE_URL) --out-file src/generated/db.ts --exclude-pattern schema_migrations",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "kysely": "^0.29.6",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "kysely-codegen": "^0.20.0"
+  }
+}
