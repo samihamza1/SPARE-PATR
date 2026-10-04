@@ -2,7 +2,7 @@ import { withTenant } from '@autoparts/db';
 import { createDeviceSchema, enrollDeviceSchema, idParamsSchema } from '@autoparts/shared';
 import type { Device } from '@autoparts/shared';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import { audit } from '../audit';
 import type { PlatformDeps } from '../auth/plugin';
 import { revokeSessions } from '../auth/sessions';
@@ -41,7 +41,11 @@ async function loadDevice(trx: Trx, id: string): Promise<Device> {
 /** Shown as XXXXX-XXXXX; normalizeEnrollmentCode() undoes the grouping. */
 const display = (code: string) => `${code.slice(0, 5)}-${code.slice(5)}`;
 
-export function deviceRoutes(app: FastifyInstance, deps: PlatformDeps): void {
+export function deviceRoutes(
+  app: FastifyInstance,
+  deps: PlatformDeps,
+  credentialThrottle: preHandlerAsyncHookHandler,
+): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const access = 'devices.manage' as const;
 
@@ -148,6 +152,7 @@ export function deviceRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     '/devices/enroll',
     {
       schema: { body: enrollDeviceSchema },
+      preHandler: credentialThrottle,
       config: {
         access: 'public',
         rateLimit: {

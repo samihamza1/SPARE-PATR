@@ -183,3 +183,21 @@ describe('tenant configuration', () => {
     expect(after.updated_at.getTime()).toBeGreaterThan(before.updated_at.getTime());
   });
 });
+
+describe('UUID v7 ids (invariant 5)', () => {
+  it('rejects a client id of another UUID version', async () => {
+    await expect(
+      withTenant(owner, tenantA, (trx) =>
+        trx
+          .insertInto('roles')
+          .values({
+            id: '3f2c8e1a-5b6d-4c7e-8f90-123456789abc',
+            tenant_id: tenantA,
+            code: 'v4_role',
+            name: 'v4',
+          })
+          .execute(),
+      ),
+    ).rejects.toMatchObject({ code: SQLSTATE.checkViolation });
+  });
+});

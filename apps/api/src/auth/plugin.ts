@@ -13,6 +13,11 @@ export interface PlatformDeps {
   /** false only for local http development. */
   cookieSecure: boolean;
   now: () => Date;
+  /**
+   * Credential attempts (login, device enrollment) allowed per client IP per minute,
+   * across all accounts. Caps the Argon2 work one address can trigger. Default 30.
+   */
+  ipAttemptsPerMinute?: number;
 }
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { passwordSchema } from '../auth/password';
 import { permissionSchema } from '../auth/permissions';
-import { uuidSchema } from '../ids';
+import { uuidSchema, uuidV7Schema } from '../ids';
 import { currencyCodeSchema, decimalStringSchema } from '../money';
 import { tenantSettingsSchema } from '../settings';
 
@@ -95,7 +95,7 @@ export const userSchema = z.object({
 export type User = z.infer<typeof userSchema>;
 
 export const createUserSchema = z.object({
-  id: uuidSchema,
+  id: uuidV7Schema,
   username: usernameSchema,
   displayName: displayNameSchema,
   email: z.email().nullish(),
@@ -127,7 +127,7 @@ export const roleSchema = z.object({
 export type Role = z.infer<typeof roleSchema>;
 
 export const createRoleSchema = z.object({
-  id: uuidSchema,
+  id: uuidV7Schema,
   code: z
     .string()
     .regex(/^[a-z][a-z0-9_]*$/)
@@ -171,7 +171,7 @@ export const currencySchema = z.object({
 export type Currency = z.infer<typeof currencySchema>;
 
 export const createCurrencySchema = z.object({
-  id: uuidSchema,
+  id: uuidV7Schema,
   code: currencyCodeSchema,
   minorUnits: z.int().min(0).max(4),
   cashIncrement: decimalStringSchema.nullish(),
@@ -199,7 +199,7 @@ export const deviceSchema = z.object({
 export type Device = z.infer<typeof deviceSchema>;
 
 export const createDeviceSchema = z.object({
-  id: uuidSchema,
+  id: uuidV7Schema,
   name: z.string().trim().min(1).max(100),
 });
 

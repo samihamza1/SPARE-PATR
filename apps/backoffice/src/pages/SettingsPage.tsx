@@ -48,8 +48,6 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
     },
   });
 
-  const num = (v: string | number) => (typeof v === 'number' ? v : Number.parseInt(v, 10));
-
   return (
     <Paper
       withBorder
@@ -127,11 +125,13 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
             max={1440}
             value={settings.session?.idleMinutes ?? 30}
             onChange={(v) => {
+              // Ignore the transient empty value while the field is being edited.
+              if (typeof v !== 'number') return;
               setSettings({
                 ...settings,
                 session: {
                   absoluteHours: settings.session?.absoluteHours ?? 12,
-                  idleMinutes: num(v),
+                  idleMinutes: v,
                 },
               });
             }}
@@ -142,11 +142,13 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
             max={24}
             value={settings.session?.absoluteHours ?? 12}
             onChange={(v) => {
+              // Ignore the transient empty value while the field is being edited.
+              if (typeof v !== 'number') return;
               setSettings({
                 ...settings,
                 session: {
                   idleMinutes: settings.session?.idleMinutes ?? 30,
-                  absoluteHours: num(v),
+                  absoluteHours: v,
                 },
               });
             }}
@@ -157,11 +159,13 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
             max={50}
             value={settings.security?.maxFailedLogins ?? 5}
             onChange={(v) => {
+              // Ignore the transient empty value while the field is being edited.
+              if (typeof v !== 'number') return;
               setSettings({
                 ...settings,
                 security: {
                   lockoutMinutes: settings.security?.lockoutMinutes ?? 15,
-                  maxFailedLogins: num(v),
+                  maxFailedLogins: v,
                 },
               });
             }}
@@ -172,11 +176,13 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
             max={1440}
             value={settings.security?.lockoutMinutes ?? 15}
             onChange={(v) => {
+              // Ignore the transient empty value while the field is being edited.
+              if (typeof v !== 'number') return;
               setSettings({
                 ...settings,
                 security: {
                   maxFailedLogins: settings.security?.maxFailedLogins ?? 5,
-                  lockoutMinutes: num(v),
+                  lockoutMinutes: v,
                 },
               });
             }}

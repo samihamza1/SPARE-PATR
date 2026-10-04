@@ -2,7 +2,7 @@ import type { DB } from '@autoparts/db';
 import { withTenant } from '@autoparts/db';
 import { changeOwnPasswordSchema, loginRequestSchema } from '@autoparts/shared';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, preHandlerAsyncHookHandler } from 'fastify';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
 import { audit } from '../audit';
@@ -74,13 +74,18 @@ export function setSessionCookie(
   });
 }
 
-export function authRoutes(app: FastifyInstance, deps: PlatformDeps): void {
+export function authRoutes(
+  app: FastifyInstance,
+  deps: PlatformDeps,
+  credentialThrottle: preHandlerAsyncHookHandler,
+): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
 
   r.post(
     '/auth/login',
     {
       schema: { body: loginRequestSchema },
+      preHandler: credentialThrottle,
       config: {
         access: 'public',
         rateLimit: {

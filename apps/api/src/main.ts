@@ -18,8 +18,17 @@ const app = buildServer(
       now: () => new Date(),
     },
   },
-  // Behind a reverse proxy, set trustProxy so request.ip (rate limits, audit) is the client.
-  { logger: true },
+  // TRUST_PROXY makes request.ip (rate limits, audit) the client, not the proxy.
+  {
+    logger: true,
+    trustProxy:
+      typeof config.trustProxy === 'number'
+        ? (() => {
+            const hops = config.trustProxy;
+            return (_address: string, hop: number) => hop < hops;
+          })()
+        : config.trustProxy,
+  },
 );
 app.addHook('onClose', () => db.destroy());
 
