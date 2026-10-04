@@ -2,6 +2,10 @@ import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type { PlatformDeps } from '../auth/plugin';
 import { ApiError } from '../errors';
 import { authRoutes } from './auth';
+import { partRoutes } from './catalog/parts';
+import { priceRoutes } from './catalog/prices';
+import { searchRoutes } from './catalog/search';
+import { taxonomyRoutes } from './catalog/taxonomy';
 import { deviceRoutes } from './devices';
 import { roleRoutes } from './roles';
 import { sessionRoutes } from './sessions';
@@ -32,4 +36,8 @@ export function registerPlatformRoutes(app: FastifyInstance, deps: PlatformDeps)
   settingsRoutes(app, deps);
   deviceRoutes(app, deps, credentialThrottle);
   sessionRoutes(app, deps);
+  taxonomyRoutes(app, deps);
+  partRoutes(app, deps);
+  priceRoutes(app, deps);
+  searchRoutes(app, deps);
 }
