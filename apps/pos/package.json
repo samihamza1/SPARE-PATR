@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@autoparts/shared": "workspace:*",
+    "@mantine/core": "^9.6.3",
+    "@mantine/hooks": "^9.6.3",
     "i18next": "^26.4.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

@@ -1,9 +1,32 @@
 {
   "app": {
     "title": "Point of Sale",
-    "status": "The foundation is ready. Sales screens arrive in the next sprints."
+    "status": "Sign-in and sales screens arrive in the POS phase."
   },
   "language": {
     "switch": "العربية"
+  },
+  "enroll": {
+    "title": "Enroll this device",
+    "instructions": "Ask the shop administrator to add this device in the back office, then enter the shop code and the enrollment code they see.",
+    "shopCode": "Shop code",
+    "code": "Enrollment code",
+    "codePlaceholder": "XXXXX-XXXXX",
+    "submit": "Enroll device",
+    "done": "Device enrolled",
+    "doneDetail": "This device is enrolled with shop {{shop}}."
+  },
+  "errors": {
+    "network": "Cannot reach the server",
+    "request": {
+      "invalid": "Some values are not valid",
+      "rate_limited": "Too many attempts; wait a minute and try again"
+    },
+    "device": {
+      "invalid_code": "The enrollment code is wrong or has expired"
+    },
+    "server": {
+      "error": "Something went wrong"
+    }
   }
 }

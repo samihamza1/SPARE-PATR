@@ -154,6 +154,12 @@ importers:
       '@autoparts/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@mantine/core':
+        specifier: ^9.6.3
+        version: 9.6.3(@mantine/hooks@9.6.3(react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@mantine/hooks':
+        specifier: ^9.6.3
+        version: 9.6.3(react@19.3.0)
       i18next:
         specifier: ^26.4.2
         version: 26.4.2(typescript@6.0.3)
