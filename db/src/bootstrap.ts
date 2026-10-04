@@ -11,6 +11,8 @@ export interface BootstrapOptions {
   recreate?: boolean;
 }
 
+const BOOTSTRAP_LOCK_KEY = '7202610040002';
+
 function credentials(connectionString: string, expectedRole: string): string {
   const url = new URL(connectionString);
   const user = decodeURIComponent(url.username);
@@ -37,6 +39,8 @@ export async function bootstrap(options: BootstrapOptions): Promise<void> {
   const admin = new pg.Client({ connectionString: options.adminUrl });
   await admin.connect();
   try {
+    // Roles are cluster-wide: serialise concurrent bootstraps (e.g. parallel test setups).
+    await admin.query('SELECT pg_advisory_lock($1)', [BOOTSTRAP_LOCK_KEY]);
     const ident = (s: string) => admin.escapeIdentifier(s);
     const literal = (s: string) => admin.escapeLiteral(s);
     for (const [role, password] of [
