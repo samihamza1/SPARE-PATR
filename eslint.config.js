@@ -62,7 +62,30 @@ export default defineConfig(
     files: ['apps/pos/src/**/*.tsx', 'apps/backoffice/src/**/*.tsx'],
     ignores: ['**/*.test.tsx'],
     plugins: { i18next },
-    rules: { 'i18next/no-literal-string': ['error', { mode: 'jsx-only' }] },
+    rules: {
+      'i18next/no-literal-string': [
+        'error',
+        {
+          mode: 'jsx-only',
+          // Only attributes people read or hear are user-facing text; dir="ltr", route paths
+          // and layout props are not.
+          'jsx-attributes': {
+            include: ['title', 'alt', 'placeholder', 'label', 'description', 'error', 'aria-.*'],
+          },
+          callees: {
+            exclude: [
+              'i18n(ext)?',
+              't',
+              'navigate',
+              'require',
+              'includes',
+              'startsWith',
+              'endsWith',
+            ],
+          },
+        },
+      ],
+    },
   },
   prettier,
 );
