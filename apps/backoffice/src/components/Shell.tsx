@@ -2,7 +2,7 @@ import type { Permission } from '@autoparts/shared';
 import { AppShell, Burger, Button, Group, NavLink, Stack, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useTranslation } from 'react-i18next';
-import { Outlet, NavLink as RouterLink, useNavigate } from 'react-router';
+import { Outlet, NavLink as RouterLink } from 'react-router';
 import { LANGUAGE_KEY, useAuth } from '../auth';
 
 interface NavItem {
@@ -40,7 +40,6 @@ export function LanguageSwitch() {
 export function Shell() {
   const { t } = useTranslation();
   const { me, can, logout } = useAuth();
-  const navigate = useNavigate();
   const [opened, { toggle, close }] = useDisclosure();
 
   return (
@@ -70,7 +69,8 @@ export function Shell() {
             <Button
               variant="light"
               onClick={() => {
-                void logout().then(() => navigate('/login'));
+                // RequireAuth sends us to the login page once the session is gone.
+                void logout();
               }}
             >
               {t('auth.logout')}

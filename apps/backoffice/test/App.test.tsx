@@ -93,6 +93,31 @@ describe('shell and permissions', () => {
     expect(within(nav).getAllByRole('link')).toHaveLength(6);
   });
 
+  it('signs out to the login page, and the next user starts at home', async () => {
+    const api = new FakeApi()
+      .on('GET /auth/me', { status: 200, body: me(ALL) })
+      .on('GET /audit-log', { status: 200, body: [] })
+      .on('GET /users', { status: 200, body: USERS })
+      .on('POST /auth/logout', { status: 204 })
+      .on('POST /auth/login', { status: 200, body: me([], { displayName: 'كاشير' }) });
+    api.install();
+    await renderApp('/audit');
+    fireEvent.click(await screen.findByRole('button', { name: ar.auth.logout }));
+    await screen.findByRole('heading', { name: ar.auth.title });
+    expect(api.calls.some((c) => c.method === 'POST' && c.path === '/auth/logout')).toBe(true);
+    fireEvent.change(screen.getByLabelText(ar.auth.shopCode, { exact: false }), {
+      target: { value: 'sky-motors' },
+    });
+    fireEvent.change(screen.getByLabelText(ar.auth.username, { exact: false }), {
+      target: { value: 'cash1' },
+    });
+    fireEvent.change(screen.getByLabelText(ar.auth.password, { exact: false }), {
+      target: { value: 'cashier passphrase' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: ar.auth.submit }));
+    await screen.findByRole('heading', { name: 'أهلاً كاشير' });
+  });
+
   it('explains a missing permission when a page is opened directly', async () => {
     new FakeApi().on('GET /auth/me', { status: 200, body: me([]) }).install();
     await renderApp('/settings');

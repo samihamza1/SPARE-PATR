@@ -84,12 +84,20 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
 function RolesModal({ user, roles, onClose }: { user: User; roles: Role[]; onClose: () => void }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // Shown immediately; reverted if the API refuses (e.g. removing the last administrator).
+  const [checked, setChecked] = useState(() => new Set(user.roleIds));
   const toggle = useMutation({
     mutationFn: ({ roleId, grant }: { roleId: string; grant: boolean }) =>
       grant
         ? api<User>('POST', `/users/${user.id}/roles`, { roleId })
         : api<User>('POST', `/users/${user.id}/roles/${roleId}/revoke`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS_KEY }),
+    onSuccess: (updated) => {
+      setChecked(new Set(updated.roleIds));
+      return queryClient.invalidateQueries({ queryKey: USERS_KEY });
+    },
+    onError: () => {
+      setChecked(new Set(user.roleIds));
+    },
   });
   return (
     <Modal opened onClose={onClose} title={t('users.rolesOf', { name: user.displayName })}>
@@ -99,10 +107,15 @@ function RolesModal({ user, roles, onClose }: { user: User; roles: Role[]; onClo
           <Checkbox
             key={role.id}
             label={roleLabel(t, role)}
-            checked={user.roleIds.includes(role.id)}
+            checked={checked.has(role.id)}
             disabled={toggle.isPending}
             onChange={(e) => {
-              toggle.mutate({ roleId: role.id, grant: e.currentTarget.checked });
+              const grant = e.currentTarget.checked;
+              const next = new Set(checked);
+              if (grant) next.add(role.id);
+              else next.delete(role.id);
+              setChecked(next);
+              toggle.mutate({ roleId: role.id, grant });
             }}
           />
         ))}
