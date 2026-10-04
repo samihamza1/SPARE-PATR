@@ -17,7 +17,8 @@
     "db:bootstrap": "pnpm --filter @autoparts/db bootstrap",
     "db:migrate": "pnpm --filter @autoparts/db migrate",
     "db:reset": "pnpm --filter @autoparts/db reset",
-    "db:codegen": "pnpm --filter @autoparts/db codegen"
+    "db:codegen": "pnpm --filter @autoparts/db codegen",
+    "db:codegen:verify": "pnpm --filter @autoparts/db codegen:verify"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

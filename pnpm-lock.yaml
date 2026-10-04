@@ -139,6 +139,9 @@ importers:
 
   db:
     dependencies:
+      '@autoparts/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       kysely:
         specifier: ^0.29.6
         version: 0.29.6

@@ -4,16 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "bootstrap": "tsx src/cli/bootstrap.ts",
     "migrate": "tsx src/cli/migrate.ts",
     "reset": "tsx src/cli/reset.ts",
-    "codegen": "kysely-codegen --dialect postgres --url env(OWNER_DATABASE_URL) --out-file src/generated/db.ts --exclude-pattern schema_migrations",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "codegen": "tsx src/cli/codegen.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "codegen:verify": "tsx src/cli/codegen.ts --verify"
   },
   "dependencies": {
+    "@autoparts/shared": "workspace:*",
     "kysely": "^0.29.6",
     "pg": "^8.23.1"
   },
