@@ -88,7 +88,9 @@
     "devices": { "manage": "Manage devices" },
     "sessions": { "manage": "Manage sessions" },
     "audit": { "read": "View audit log" },
-    "cost": { "view": "See cost and margin" }
+    "cost": { "view": "See cost and margin" },
+    "catalog": { "manage": "Manage the catalog", "import": "Import catalog files" },
+    "prices": { "manage": "Manage prices" }
   },
   "roles": {
     "title": "Roles and permissions",

@@ -14,6 +14,10 @@ export const PERMISSIONS = [
   'audit.read',
   // BRIEF: cashiers sell but cannot see cost or margin.
   'cost.view',
+  // Catalog (Sprint 3). Reading and searching the catalog only needs a session.
+  'catalog.manage',
+  'catalog.import',
+  'prices.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
