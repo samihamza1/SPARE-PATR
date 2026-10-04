@@ -56,6 +56,22 @@ and 12 hours absolute.
 - One indexed lookup per request (session + user + tenant + roles) inside the tenant
   transaction.
 - Behind a reverse proxy, `trustProxy` must be configured so rate limits and audit see
-  the client address.
+  the client address (`TRUST_PROXY`, see the addendum).
 - MFA, password reset by e-mail and offline PIN unlock are not covered here (ADR 0011
   for offline).
+
+## Addendum (2026-10-04, Sprint 3 review)
+
+These additions tighten the decision above without changing it.
+
+- **Per-IP limit on credential endpoints**: `/auth/login` and `/devices/enroll` share
+  one bucket per client IP (30 requests a minute by default). It sits on top of the
+  per-account limits. Without it, one address could spray many usernames and make the
+  server run Argon2 without bound.
+- **`TRUST_PROXY`** (API environment) sets Fastify's `trustProxy`. It accepts `true`, a
+  number of proxy hops, or a list of addresses or CIDRs. It is unset (no proxy) by
+  default. It must be set behind a reverse proxy, or every client shares the proxy's
+  address in rate limits and audit entries.
+- **Rate-limit store**: kept in process memory, so limits apply per API instance. When
+  more than one instance runs, move the store to Redis (`@fastify/rate-limit` supports
+  it).
