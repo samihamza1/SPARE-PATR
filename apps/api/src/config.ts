@@ -9,6 +9,9 @@ const envSchema = z.object({
   ALLOWED_ORIGINS: z.string().default(''),
   // Secure cookies by default; set to "false" only for plain-http local development.
   COOKIE_SECURE: z.enum(['true', 'false']).default('true'),
+  // Behind a reverse proxy: "true", a hop count, or a comma-separated list of proxy
+  // addresses/CIDRs, so request.ip (rate limits, audit) is the real client. Default off.
+  TRUST_PROXY: z.string().default('false'),
 });
 
 export interface Config {
@@ -17,6 +20,15 @@ export interface Config {
   port: number;
   allowedOrigins: string[];
   cookieSecure: boolean;
+  trustProxy: boolean | number | string;
+}
+
+function parseTrustProxy(value: string): boolean | number | string {
+  const v = value.trim();
+  if (v === '' || v === 'false') return false;
+  if (v === 'true') return true;
+  if (/^\d+$/.test(v)) return Number.parseInt(v, 10);
+  return v;
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -25,7 +37,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     const problems = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
     throw new Error(`Invalid API configuration: ${problems.join('; ')}`);
   }
-  const { APP_DATABASE_URL, API_HOST, API_PORT, ALLOWED_ORIGINS, COOKIE_SECURE } = result.data;
+  const { APP_DATABASE_URL, API_HOST, API_PORT, ALLOWED_ORIGINS, COOKIE_SECURE, TRUST_PROXY } =
+    result.data;
   const allowedOrigins = ALLOWED_ORIGINS.split(',')
     .map((o) => o.trim())
     .filter((o) => o !== '');
@@ -42,5 +55,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     port: API_PORT,
     allowedOrigins,
     cookieSecure: COOKIE_SECURE === 'true',
+    trustProxy: parseTrustProxy(TRUST_PROXY),
   };
 }

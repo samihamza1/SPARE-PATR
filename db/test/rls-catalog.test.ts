@@ -185,6 +185,23 @@ async function definersWithoutSearchPath(exec: Executor = db): Promise<string[]>
   return rows.map((r) => r.fn);
 }
 
+/** Invariant 5: every uuid `id` column must be checked to be a UUID v7 by the database. */
+async function idsWithoutV7Check(exec: Executor = db): Promise<string[]> {
+  const { rows } = await sql<{ table: string }>`
+    SELECT c.relname AS table
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'id' AND NOT a.attisdropped
+    WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public'
+      AND a.atttypid = 'uuid'::regtype
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint k
+        WHERE k.conrelid = c.oid AND k.contype = 'c' AND k.convalidated
+          AND pg_get_constraintdef(k.oid) LIKE '%is_uuid_v7(id)%')
+    ORDER BY 1`.execute(exec);
+  return rows.map((r) => r.table);
+}
+
 describe('tenant isolation catalog (invariant 4)', () => {
   it('finds the expected tables (sanity check for the queries below)', async () => {
     const names = (await userTables()).map((t) => t.table);
@@ -236,6 +253,10 @@ describe('tenant isolation catalog (invariant 4)', () => {
 
   it('pins search_path on every SECURITY DEFINER function', async () => {
     expect(await definersWithoutSearchPath()).toEqual([]);
+  });
+
+  it('checks that every uuid id is a UUID v7 (invariant 5)', async () => {
+    expect(await idsWithoutV7Check()).toEqual([]);
   });
 });
 
@@ -313,6 +334,16 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
         foreignKeysWithoutTenant,
       ),
     ).toEqual(['guard_probe.guard_probe_user_fk']);
+  });
+
+  it('flags a uuid id without a UUID v7 check, and accepts one with it', async () => {
+    expect(await probe(probeTable, idsWithoutV7Check)).toContain('guard_probe');
+    expect(
+      await probe(
+        `${probeTable} ALTER TABLE guard_probe ADD CHECK (is_uuid_v7(id));`,
+        idsWithoutV7Check,
+      ),
+    ).not.toContain('guard_probe');
   });
 
   it('flags a SECURITY DEFINER function without a pinned search_path', async () => {
