@@ -50,6 +50,8 @@ CREATE TABLE parts (
   search_text   text GENERATED ALWAYS AS (
                   normalize_search(coalesce(name_ar, '') || ' ' || coalesce(name_en, '') || ' ' || sku)
                 ) STORED,
+  -- SKU in part-number form, so "flt 001" finds FLT-001 like any other number.
+  sku_norm      text GENERATED ALWAYS AS (normalize_part_number(sku)) STORED,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
   archived_at   timestamptz,
@@ -60,6 +62,7 @@ CREATE TABLE parts (
 );
 CREATE UNIQUE INDEX parts_tenant_sku_key ON parts (tenant_id, upper(sku));
 CREATE INDEX parts_search_idx ON parts USING gin (tenant_id, search_text gin_trgm_ops);
+CREATE INDEX parts_tenant_sku_norm_idx ON parts (tenant_id, sku_norm text_pattern_ops);
 CREATE INDEX parts_tenant_brand_idx ON parts (tenant_id, brand_id);
 CREATE INDEX parts_tenant_category_idx ON parts (tenant_id, category_id);
 CREATE INDEX parts_tenant_ungraded_idx ON parts (tenant_id) WHERE quality_grade IS NULL AND archived_at IS NULL;

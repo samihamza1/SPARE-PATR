@@ -175,6 +175,7 @@ export interface Parts {
   quality_grade: string | null;
   search_text: Generated<string | null>;
   sku: string;
+  sku_norm: Generated<string | null>;
   tenant_id: string;
   unit: Generated<string>;
   updated_at: Generated<Timestamp>;
