@@ -34,3 +34,6 @@ Template:
 | [0010](0010-tenant-settings.md)             | Tenant settings                                             |
 | [0011](0011-devices-and-offline-pin.md)     | Device enrollment and offline PIN (design)                  |
 | [0012](0012-ui-stack.md)                    | UI stack: Mantine, React Router, TanStack Query; Playwright |
+| [0013](0013-shared-vehicle-tree.md)         | Shared vehicle tree: shared tables under RLS                |
+| [0014](0014-catalog-model.md)               | Catalog model                                               |
+| [0015](0015-catalog-search.md)              | Catalog search                                              |
