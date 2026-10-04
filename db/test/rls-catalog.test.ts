@@ -12,6 +12,14 @@ type Executor = Kysely<DB>;
  * forced RLS, or be listed here explicitly as global. This test fails for any table that
  * is neither, so a forgotten policy cannot reach production.
  */
+/**
+ * Shared tables mix platform rows (tenant_id IS NULL, readable by every tenant) with
+ * tenant-local rows (ADR 0013). They get their own checks instead of the tenant ones.
+ */
+const SHARED_TABLES = new Set(['vehicles']);
+const APP_ROLE_NAME = 'autoparts_app';
+const OWNER_ROLE_NAME = 'autoparts_owner';
+
 const GLOBAL_TABLES = new Set([
   'schema_migrations',
   // slug -> tenant id for login; unreadable by the app role (ADR 0008).
@@ -56,6 +64,8 @@ async function userTables(exec: Executor = db): Promise<TableRow[]> {
 
 interface PolicyRow {
   table: string;
+  name: string;
+  roles: string[];
   permissive: string;
   cmd: string;
   qual: string | null;
@@ -64,7 +74,8 @@ interface PolicyRow {
 
 async function policies(exec: Executor = db): Promise<PolicyRow[]> {
   const { rows } = await sql<PolicyRow>`
-    SELECT tablename AS table, permissive, cmd, qual, with_check
+    SELECT tablename AS table, policyname AS name, roles::text[] AS roles, permissive, cmd, qual,
+           with_check
     FROM pg_policies WHERE schemaname = 'public'`.execute(exec);
   return rows;
 }
@@ -90,7 +101,7 @@ async function tablesWithoutForcedRls(exec: Executor = db): Promise<string[]> {
 async function tablesWithoutTenantPolicy(exec: Executor = db): Promise<string[]> {
   const all = await policies(exec);
   return (await userTables(exec))
-    .filter((t) => !GLOBAL_TABLES.has(t.table))
+    .filter((t) => !GLOBAL_TABLES.has(t.table) && !SHARED_TABLES.has(t.table))
     .filter(
       (t) =>
         !all.some(
@@ -108,6 +119,7 @@ async function tablesWithoutTenantPolicy(exec: Executor = db): Promise<string[]>
 async function leakyPolicies(exec: Executor = db): Promise<PolicyRow[]> {
   return (await policies(exec)).filter(
     (p) =>
+      !SHARED_TABLES.has(p.table) &&
       p.permissive === 'PERMISSIVE' &&
       (p.qual?.includes(TENANT_PREDICATE) !== true ||
         (p.with_check !== null && !p.with_check.includes(TENANT_PREDICATE))),
@@ -115,13 +127,14 @@ async function leakyPolicies(exec: Executor = db): Promise<PolicyRow[]> {
 }
 
 interface IndexRow {
+  table: string;
   index: string;
   first_column: string;
 }
 
 async function multiColumnTenantIndexes(exec: Executor = db): Promise<IndexRow[]> {
   const { rows } = await sql<IndexRow>`
-    SELECT i.indexrelid::regclass::text AS index, a.attname AS first_column
+    SELECT c.relname AS table, i.indexrelid::regclass::text AS index, a.attname AS first_column
     FROM pg_index i
     JOIN pg_class c ON c.oid = i.indrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -132,7 +145,7 @@ async function multiColumnTenantIndexes(exec: Executor = db): Promise<IndexRow[]
                   WHERE t.attrelid = c.oid AND t.attname = 'tenant_id' AND NOT t.attisdropped)`.execute(
     exec,
   );
-  return rows;
+  return rows.filter((r) => !SHARED_TABLES.has(r.table));
 }
 
 /**
@@ -145,6 +158,8 @@ async function foreignKeysWithoutTenant(exec: Executor = db): Promise<string[]> 
     FROM pg_constraint con
     JOIN pg_namespace n ON n.oid = con.connamespace
     WHERE con.contype = 'f' AND n.nspname = 'public'
+      AND con.conrelid::regclass::text <> ALL (${[...SHARED_TABLES]}::text[])
+      AND con.confrelid::regclass::text <> ALL (${[...SHARED_TABLES]}::text[])
       AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = con.conrelid
                   AND a.attname = 'tenant_id' AND NOT a.attisdropped)
       AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = con.confrelid
@@ -154,6 +169,62 @@ async function foreignKeysWithoutTenant(exec: Executor = db): Promise<string[]> 
         JOIN pg_attribute sa ON sa.attrelid = con.conrelid AND sa.attnum = k.src
         JOIN pg_attribute da ON da.attrelid = con.confrelid AND da.attnum = k.dst
         WHERE sa.attname = 'tenant_id' AND da.attname = 'tenant_id')
+    ORDER BY 1`.execute(exec);
+  return rows.map((r) => r.constraint);
+}
+
+/**
+ * Shared tables: the app role may read platform rows but must never write one, and any
+ * broader policy is reserved for the owner role (operator tooling).
+ */
+async function sharedPolicyViolations(exec: Executor = db): Promise<string[]> {
+  const problems: string[] = [];
+  const all = await policies(exec);
+  for (const table of SHARED_TABLES) {
+    const own = all.filter((p) => p.table === table);
+    if (own.length === 0) problems.push(`${table}: no policies`);
+    for (const p of own) {
+      const forApp = p.roles.includes('public') || p.roles.includes(APP_ROLE_NAME);
+      if (!forApp) {
+        if (p.roles.some((r) => r !== OWNER_ROLE_NAME)) {
+          problems.push(`${table}.${p.name}: broad policy for ${p.roles.join(',')}`);
+        }
+        continue;
+      }
+      if (p.qual !== null && !p.qual.includes(TENANT_PREDICATE)) {
+        problems.push(`${table}.${p.name}: USING ignores the tenant`);
+      }
+      if (
+        p.with_check !== null &&
+        (!p.with_check.includes(TENANT_PREDICATE) || /IS NULL/i.test(p.with_check))
+      ) {
+        problems.push(`${table}.${p.name}: WITH CHECK lets the app write platform rows`);
+      }
+      if (p.cmd !== 'SELECT' && p.with_check === null && p.cmd !== 'DELETE') {
+        problems.push(`${table}.${p.name}: write policy without WITH CHECK`);
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * A tenant table cannot use a composite FK into a shared table (platform rows have no
+ * tenant_id), so it needs a trigger checking the target is global or its own (ADR 0013).
+ */
+async function sharedReferencesWithoutVisibilityCheck(exec: Executor = db): Promise<string[]> {
+  const { rows } = await sql<{ constraint: string }>`
+    SELECT format('%s.%s', con.conrelid::regclass, con.conname) AS constraint
+    FROM pg_constraint con
+    WHERE con.contype = 'f'
+      AND con.confrelid::regclass::text = ANY (${[...SHARED_TABLES]}::text[])
+      AND con.conrelid <> con.confrelid
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_trigger t JOIN pg_proc f ON f.oid = t.tgfoid
+        WHERE t.tgrelid = con.conrelid AND NOT t.tgisinternal
+          AND f.proname LIKE 'check_visible_%'
+          AND t.tgtype & 2 <> 0   -- BEFORE
+          AND t.tgtype & 4 <> 0)  -- INSERT
     ORDER BY 1`.execute(exec);
   return rows.map((r) => r.constraint);
 }
@@ -255,6 +326,14 @@ describe('tenant isolation catalog (invariant 4)', () => {
     expect(await definersWithoutSearchPath()).toEqual([]);
   });
 
+  it('keeps shared tables read-only for platform rows (ADR 0013)', async () => {
+    expect(await sharedPolicyViolations()).toEqual([]);
+  });
+
+  it('guards every reference into a shared table with a visibility trigger', async () => {
+    expect(await sharedReferencesWithoutVisibilityCheck()).toEqual([]);
+  });
+
   it('checks that every uuid id is a UUID v7 (invariant 5)', async () => {
     expect(await idsWithoutV7Check()).toEqual([]);
   });
@@ -321,7 +400,11 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
       'CREATE INDEX guard_probe_idx ON users (username, tenant_id);',
       multiColumnTenantIndexes,
     );
-    expect(rows).toContainEqual({ index: 'guard_probe_idx', first_column: 'username' });
+    expect(rows).toContainEqual({
+      table: 'users',
+      index: 'guard_probe_idx',
+      first_column: 'username',
+    });
   });
 
   it('flags a foreign key between tenant tables that skips tenant_id', async () => {
@@ -344,6 +427,25 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
         idsWithoutV7Check,
       ),
     ).not.toContain('guard_probe');
+  });
+
+  it('flags a shared-table policy that lets the app write platform rows', async () => {
+    const problems = await probe(
+      `CREATE POLICY loose_write ON vehicles FOR INSERT TO autoparts_app
+         WITH CHECK (tenant_id IS NULL OR tenant_id = current_tenant_id());`,
+      sharedPolicyViolations,
+    );
+    expect(problems).toContain('vehicles.loose_write: WITH CHECK lets the app write platform rows');
+  });
+
+  it('flags a reference into a shared table without a visibility trigger', async () => {
+    expect(
+      await probe(
+        `CREATE TABLE guard_probe (tenant_id uuid NOT NULL, id uuid NOT NULL,
+           vehicle_id uuid REFERENCES vehicles (id), PRIMARY KEY (tenant_id, id));`,
+        sharedReferencesWithoutVisibilityCheck,
+      ),
+    ).toEqual(['guard_probe.guard_probe_vehicle_id_fkey']);
   });
 
   it('flags a SECURITY DEFINER function without a pinned search_path', async () => {

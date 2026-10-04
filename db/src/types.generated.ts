@@ -41,6 +41,27 @@ export interface AuditLog {
   tenant_id: string;
 }
 
+export interface Brands {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: string;
+  kind: string;
+  name: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface Categories {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: string;
+  name_ar: string | null;
+  name_en: string | null;
+  parent_id: string | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface Devices {
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -53,6 +74,119 @@ export interface Devices {
   name: string;
   revoked_at: Timestamp | null;
   revoked_by: string | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface Fitments {
+  created_at: Generated<Timestamp>;
+  id: string;
+  note: string | null;
+  part_id: string;
+  removed_at: Timestamp | null;
+  tenant_id: string;
+  vehicle_id: string;
+}
+
+export interface ImportBatches {
+  applied_at: Timestamp | null;
+  applied_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  file_name: string;
+  file_sha256: Buffer;
+  header_row: number | null;
+  id: string;
+  kind: string;
+  mapping: Generated<Json>;
+  sheet_name: string | null;
+  stats: Generated<Json>;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ImportRows {
+  batch_id: string;
+  created_at: Generated<Timestamp>;
+  decision: string | null;
+  id: string;
+  issues: Generated<string[]>;
+  parsed: Generated<Json>;
+  part_id: string | null;
+  raw: Json;
+  row_key: string | null;
+  row_number: number;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface InterchangeGroups {
+  created_at: Generated<Timestamp>;
+  id: string;
+  note: string | null;
+  tenant_id: string;
+}
+
+export interface InterchangeMembers {
+  created_at: Generated<Timestamp>;
+  group_id: string;
+  id: string;
+  part_id: string;
+  removed_at: Timestamp | null;
+  tenant_id: string;
+}
+
+export interface PartNumbers {
+  brand_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: string;
+  kind: string;
+  number: string;
+  number_norm: Generated<string | null>;
+  part_id: string;
+  removed_at: Timestamp | null;
+  tenant_id: string;
+}
+
+export interface PartPrices {
+  effective_at: Timestamp;
+  id: string;
+  import_batch_id: string | null;
+  part_id: string;
+  price: Numeric;
+  price_list_id: string;
+  reason: string | null;
+  recorded_at: Generated<Timestamp>;
+  recorded_by: string | null;
+  source: string;
+  tenant_id: string;
+}
+
+export interface Parts {
+  archived_at: Timestamp | null;
+  brand_id: string | null;
+  category_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: string;
+  name_ar: string | null;
+  name_en: string | null;
+  notes: string | null;
+  quality_grade: string | null;
+  search_text: Generated<string | null>;
+  sku: string;
+  tenant_id: string;
+  unit: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PriceLists {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  currency: string;
+  id: string;
+  is_default: Generated<boolean>;
+  name: string;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
 }
@@ -82,6 +216,18 @@ export interface Sessions {
   tenant_id: string;
   user_agent: string | null;
   user_id: string;
+}
+
+export interface Supersessions {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  effective_at: Timestamp;
+  id: string;
+  new_part_id: string;
+  old_part_id: string;
+  reason: string | null;
+  removed_at: Timestamp | null;
+  tenant_id: string;
 }
 
 export interface TenantCurrencies {
@@ -144,14 +290,58 @@ export interface Users {
   username: string;
 }
 
+export interface VehicleAliases {
+  alias: string;
+  alias_norm: Generated<string | null>;
+  category_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: string;
+  removed_at: Timestamp | null;
+  target: string;
+  tenant_id: string;
+  vehicle_id: string | null;
+}
+
+export interface Vehicles {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  displacement_cc: number | null;
+  engine_code: string | null;
+  fuel: string | null;
+  id: string;
+  level: string;
+  name: string;
+  name_ar: string | null;
+  parent_id: string | null;
+  search_text: Generated<string | null>;
+  tenant_id: string | null;
+  updated_at: Generated<Timestamp>;
+  year_from: number | null;
+  year_to: number | null;
+}
+
 export interface DB {
   audit_log: AuditLog;
+  brands: Brands;
+  categories: Categories;
   devices: Devices;
+  fitments: Fitments;
+  import_batches: ImportBatches;
+  import_rows: ImportRows;
+  interchange_groups: InterchangeGroups;
+  interchange_members: InterchangeMembers;
+  part_numbers: PartNumbers;
+  part_prices: PartPrices;
+  parts: Parts;
+  price_lists: PriceLists;
   roles: Roles;
   sessions: Sessions;
+  supersessions: Supersessions;
   tenant_currencies: TenantCurrencies;
   tenant_directory: TenantDirectory;
   tenants: Tenants;
   user_roles: UserRoles;
   users: Users;
+  vehicle_aliases: VehicleAliases;
+  vehicles: Vehicles;
 }

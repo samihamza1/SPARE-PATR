@@ -26,6 +26,7 @@
     "@types/node": "^24.19.1",
     "@types/pg": "^8.23.1",
     "dbmate": "^2.36.0",
+    "fast-check": "^4.10.2",
     "kysely-codegen": "^0.20.0",
     "vitest": "^5.0.3"
   }
