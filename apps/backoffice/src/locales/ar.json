@@ -8,7 +8,12 @@
     "roles": "الأدوار والصلاحيات",
     "settings": "الإعدادات",
     "devices": "الأجهزة",
-    "audit": "سجل التدقيق"
+    "audit": "سجل التدقيق",
+    "search": "البحث عن قطعة",
+    "parts": "القطع",
+    "vehicles": "السيارات",
+    "catalogSetup": "إعداد الكتالوج",
+    "imports": "استيراد الكتالوج"
   },
   "auth": {
     "title": "تسجيل الدخول",
@@ -196,7 +201,14 @@
       "session": "الجلسات",
       "tenant": "المحل",
       "currency": "العملات",
-      "device": "الأجهزة"
+      "device": "الأجهزة",
+      "part": "القطع",
+      "brand": "الماركات",
+      "category": "الفئات",
+      "vehicle": "السيارات",
+      "vehicle_alias": "كلمات السيارات",
+      "price_list": "قوائم الأسعار",
+      "import_batch": "الاستيراد"
     },
     "actions": {
       "auth": {
@@ -227,7 +239,299 @@
         "revoke": "إلغاء جهاز"
       },
       "session": { "revoke": "إنهاء جلسة" },
-      "tenant": { "provision": "إنشاء المحل" }
+      "tenant": { "provision": "إنشاء المحل" },
+      "part": {
+        "create": "إنشاء قطعة",
+        "update": "تعديل قطعة",
+        "bulk_update": "تعديل جماعي للقطع",
+        "supersede": "إحلال قطعة"
+      },
+      "part_number": {
+        "add": "إضافة رقم قطعة",
+        "remove": "إزالة رقم قطعة"
+      },
+      "fitment": {
+        "add": "ربط سيارة",
+        "remove": "فك ربط سيارة"
+      },
+      "interchange": {
+        "link": "ربط قطع قابلة للتبادل",
+        "unlink": "خروج قطعة من مجموعة التبادل"
+      },
+      "brand": {
+        "create": "إنشاء ماركة",
+        "update": "تعديل ماركة"
+      },
+      "category": {
+        "create": "إنشاء فئة",
+        "update": "تعديل فئة"
+      },
+      "vehicle": {
+        "create": "إضافة سيارة",
+        "update": "تعديل سيارة"
+      },
+      "vehicle_alias": {
+        "create": "إضافة كلمة سيارة",
+        "remove": "إزالة كلمة سيارة"
+      },
+      "price_list": {
+        "create": "إنشاء قائمة أسعار",
+        "update": "تعديل قائمة أسعار"
+      },
+      "price": {
+        "set": "تحديد سعر"
+      },
+      "catalog": {
+        "import": "استيراد الكتالوج",
+        "import_stage": "فحص ملف استيراد",
+        "import_discard": "إلغاء استيراد"
+      }
     }
+  },
+  "search": {
+    "title": "البحث عن قطعة",
+    "placeholder": "الاسم أو رقم القطعة أو السيارة والسنة، مثل: فحمات امامية لاندكروزر 2015",
+    "submit": "بحث",
+    "noResults": "لا توجد قطع مطابقة",
+    "understood": "فهمتُ البحث كالتالي",
+    "year": "سنة {{year}}",
+    "number": "رقم {{number}}",
+    "matchedBy": {
+      "number": "رقم القطعة",
+      "text": "الاسم",
+      "vehicle": "السيارة"
+    },
+    "alternatives": "البدائل",
+    "noAlternatives": "لا بدائل",
+    "noPrice": "بلا سعر"
+  },
+  "catalog": {
+    "partsTitle": "القطع",
+    "newPart": "قطعة جديدة",
+    "sku": "رمز الصنف",
+    "nameAr": "الاسم بالعربية",
+    "nameEn": "الاسم بالإنجليزية",
+    "name": "الاسم",
+    "grade": "الجودة",
+    "brand": "الماركة",
+    "category": "الفئة",
+    "unit": "الوحدة",
+    "notes": "ملاحظات",
+    "archived": "مؤرشفة",
+    "archive": "أرشفة",
+    "restore": "استعادة",
+    "nameRequired": "أدخل اسماً بالعربية أو بالإنجليزية",
+    "filter": "ابحث في القطع",
+    "needsReview": {
+      "all": "كل القطع",
+      "ungraded": "بلا درجة جودة",
+      "no_price": "بلا سعر",
+      "no_fitment": "بلا سيارة"
+    },
+    "selected": "{{count}} محددة",
+    "bulkGrade": "تحديد الجودة",
+    "bulkApply": "تطبيق على المحدد",
+    "loadMore": "عرض المزيد",
+    "empty": "لا توجد قطع",
+    "gradeLabel": {
+      "oem": "أصلي (OEM)",
+      "premium": "ممتاز",
+      "good": "جيد",
+      "economy": "اقتصادي",
+      "none": "غير مصنّفة"
+    },
+    "relation": {
+      "replacement": "بديل حديث",
+      "interchange": "قابلة للتبادل",
+      "shared_number": "نفس رقم الوكالة"
+    },
+    "numberKind": {
+      "oem": "أرقام وكالة (OEM)",
+      "aftermarket": "أرقام تجارية",
+      "other": "أخرى"
+    },
+    "brandKind": {
+      "vehicle_maker": "صانع سيارات",
+      "aftermarket": "ماركة تجارية"
+    },
+    "level": {
+      "type": "النوع",
+      "make": "الصانع",
+      "model": "الموديل",
+      "generation": "الجيل",
+      "engine": "المحرك"
+    },
+    "details": "البيانات",
+    "numbers": "أرقام القطعة",
+    "number": "الرقم",
+    "kind": "النوع",
+    "addNumber": "إضافة رقم",
+    "fitments": "تركب على",
+    "vehicle": "السيارة",
+    "note": "ملاحظة",
+    "addFitment": "إضافة سيارة",
+    "remove": "إزالة",
+    "interchange": "قطع قابلة للتبادل",
+    "linkPart": "ربط قطعة",
+    "unlink": "الخروج من المجموعة",
+    "choosePart": "ابحث بالرمز أو الاسم أو الرقم",
+    "supersession": "الإحلال",
+    "supersededBy": "حلّت محلها",
+    "supersedes": "تحل محل",
+    "supersede": "إحلال قطعة أخرى محلها",
+    "reason": "السبب",
+    "prices": "الأسعار",
+    "priceList": "قائمة الأسعار",
+    "price": "السعر",
+    "currentPrice": "السعر الحالي",
+    "setPrice": "تحديد السعر",
+    "effectiveAt": "يسري من",
+    "effectiveNow": "الآن",
+    "history": "سجل الأسعار",
+    "recorded": "سُجِّل",
+    "source": {
+      "manual": "يدوي",
+      "import": "استيراد"
+    },
+    "noPrice": "بلا سعر",
+    "chooseVehicle": "ابحث عن سيارة",
+    "back": "العودة إلى القطع"
+  },
+  "vehicles": {
+    "title": "السيارات",
+    "all": "الكل",
+    "add": "إضافة هنا",
+    "local": "خاصة بالمحل",
+    "platform": "مشتركة",
+    "years": "السنوات",
+    "yearFrom": "من سنة",
+    "yearTo": "إلى سنة",
+    "engineCode": "رمز المحرك",
+    "displacement": "السعة (سي سي)",
+    "fuel": "الوقود",
+    "nameAr": "الاسم بالعربية",
+    "children": "داخل {{name}}",
+    "empty": "لا يوجد شيء هنا بعد",
+    "fuelType": {
+      "petrol": "بنزين",
+      "diesel": "ديزل",
+      "hybrid": "هجين",
+      "electric": "كهربائي",
+      "lpg": "غاز مسال",
+      "cng": "غاز طبيعي"
+    },
+    "aliases": "كلمات المحل للسيارات",
+    "aliasesHint": "الكلمات التي يستخدمها موظفوك وملفاتك، مثل LC للاندكروزر. يستخدمها البحث والاستيراد.",
+    "alias": "الكلمة",
+    "target": {
+      "vehicle": "سيارة",
+      "category": "فئة",
+      "ignore": "تجاهل"
+    },
+    "mapsTo": "تعني",
+    "addAlias": "إضافة كلمة"
+  },
+  "setup": {
+    "title": "إعداد الكتالوج",
+    "brands": "الماركات",
+    "categories": "الفئات",
+    "priceLists": "قوائم الأسعار",
+    "add": "إضافة",
+    "kind": "النوع",
+    "parent": "الفئة الأم",
+    "currency": "العملة",
+    "default": "افتراضية",
+    "makeDefault": "جعلها افتراضية",
+    "defaultHint": "يعرض البحث الأسعار من القائمة الافتراضية لكل عملة"
+  },
+  "import": {
+    "title": "استيراد الكتالوج",
+    "new": "استيراد جديد",
+    "history": "عمليات الاستيراد السابقة",
+    "file": "ملف جدول البيانات (‎.xlsx أو ‎.csv)",
+    "read": "قراءة الملف",
+    "privacy": "لا تُحفظ إلا الأعمدة التي تربطها من الورقة المختارة، ولا يُحفظ الملف نفسه.",
+    "steps": {
+      "file": "الملف",
+      "sheet": "الورقة",
+      "columns": "الأعمدة",
+      "codes": "رموز السيارات",
+      "preview": "المعاينة"
+    },
+    "sheet": "الورقة",
+    "rows": "{{count}} صف",
+    "headerRow": "صف العناوين",
+    "headerHint": "اضغط على الصف الذي يحوي عناوين الأعمدة؛ البيانات تبدأ تحته.",
+    "row": "الصف",
+    "field": {
+      "sku": "رمز الصنف",
+      "partNumber": "رقم القطعة",
+      "nameEn": "الاسم بالإنجليزية",
+      "nameAr": "الاسم بالعربية",
+      "vehicleCode": "رمز السيارة",
+      "sellPrice": "سعر البيع",
+      "cost": "التكلفة",
+      "quantity": "الكمية"
+    },
+    "column": "العمود",
+    "notMapped": "غير موجود في الملف",
+    "numberKind": "أرقام القطع في الملف هي",
+    "priceList": "يذهب سعر البيع إلى قائمة",
+    "costCurrency": "عملة التكلفة",
+    "skuPrefix": "بادئة رمز الصنف",
+    "skuPrefixHint": "القطع الجديدة تأخذ البادئة-00001، البادئة-00002، ... (حروف إنجليزية كبيرة وأرقام)",
+    "stage": "فحص الصفوف",
+    "codesHint": "حدّد معنى كل رمز في الملف. الرموز التي يستخدمها المحل من قبل مربوطة مسبقاً.",
+    "code": "الرمز",
+    "mapping": "يعني",
+    "unmapped": "غير مربوط",
+    "mapCode": "ربط",
+    "analyse": "تحديث المعاينة",
+    "decision": {
+      "create": "قطعة جديدة",
+      "update": "تحديث قطعة سابقة",
+      "merge": "مثل صف سابق",
+      "skip": "تخطٍّ"
+    },
+    "issue": {
+      "empty_row": "صف فارغ",
+      "no_name": "بلا اسم",
+      "bad_sku": "رمز صنف غير صالح",
+      "sku_taken": "رمز الصنف مستخدم",
+      "no_part_number": "بلا رقم قطعة",
+      "no_price": "بلا سعر",
+      "zero_price": "السعر صفر (لن يُستورد)",
+      "bad_price": "سعر غير مقروء",
+      "price_rounded": "تم تقريب السعر",
+      "bad_cost": "تكلفة غير مقروءة",
+      "bad_quantity": "كمية غير مقروءة",
+      "vehicle_unmapped": "رمز السيارة غير مربوط",
+      "price_conflict": "سعر مختلف عن الصف الأول",
+      "duplicate_row": "صف مكرر",
+      "shared_number": "رقم مشترك مع قطع أخرى",
+      "existing_part": "استُورد من قبل"
+    },
+    "next": "التالي",
+    "result": "النتيجة",
+    "allRows": "كل الصفوف",
+    "skip": "تخطٍّ",
+    "unskip": "تضمين",
+    "skippedByUser": "تخطيتَه أنت",
+    "apply": "استيراد الآن",
+    "applyConfirm": "استيراد {{count}} صف إلى الكتالوج؟ لا يمكن التراجع، لكن يمكن أرشفة القطع لاحقاً.",
+    "applied": "تم الاستيراد",
+    "discard": "إلغاء",
+    "discardConfirm": "إلغاء هذا الاستيراد؟",
+    "summary": "الملخص",
+    "pricesSet": "أسعار مسجّلة",
+    "fitmentsAdded": "روابط سيارات مضافة",
+    "openParts": "مراجعة القطع",
+    "status": {
+      "draft": "مسودة",
+      "previewed": "تم الفحص",
+      "applied": "تم الاستيراد",
+      "discarded": "ملغى"
+    },
+    "createdAt": "بدأ في"
   }
 }

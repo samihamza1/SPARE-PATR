@@ -97,6 +97,7 @@ export const aliasSchema = z.object({
   alias: z.string(),
   target: z.enum(ALIAS_TARGETS),
   vehicleId: uuidSchema.nullable(),
+  vehicleName: z.string().nullable(),
   categoryId: uuidSchema.nullable(),
 });
 export type VehicleAlias = z.infer<typeof aliasSchema>;

@@ -11,7 +11,7 @@ type Handler = (body: unknown) => { status: number; body?: unknown };
 
 /** A tiny fake of the API: "METHOD /path" -> handler. Unmatched requests fail the test. */
 export class FakeApi {
-  readonly calls: { method: string; path: string; body: unknown }[] = [];
+  readonly calls: { method: string; path: string; query: string; body: unknown }[] = [];
   private readonly routes = new Map<string, Handler>();
 
   on(route: string, handler: Handler | { status: number; body?: unknown }): this {
@@ -22,9 +22,9 @@ export class FakeApi {
   install(): void {
     vi.stubGlobal('fetch', (url: string, init?: RequestInit): Promise<Response> => {
       const method = init?.method ?? 'GET';
-      const path = url.replace(/^\/api/, '').split('?')[0] ?? '';
+      const [path = '', query = ''] = url.replace(/^\/api/, '').split('?');
       const body: unknown = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
-      this.calls.push({ method, path, body });
+      this.calls.push({ method, path, query, body });
       const handler = this.routes.get(`${method} ${path}`);
       if (handler === undefined) {
         return Promise.reject(new Error(`Unexpected request ${method} ${path}`));
@@ -65,8 +65,11 @@ export function me(
 
 export const ALL: Permission[] = [
   'audit.read',
+  'catalog.import',
+  'catalog.manage',
   'cost.view',
   'devices.manage',
+  'prices.manage',
   'roles.manage',
   'sessions.manage',
   'settings.manage',
@@ -109,7 +112,7 @@ export async function renderApp(route: string, lng?: string) {
   if (lng !== undefined) localStorage.setItem(LANGUAGE_KEY, lng);
   const i18n = await setupI18n(lng);
   const utils = render(
-    <Providers i18n={i18n} queryClient={createQueryClient()}>
+    <Providers i18n={i18n} queryClient={createQueryClient()} env="test">
       <MemoryRouter initialEntries={[route]}>
         <App />
       </MemoryRouter>
