@@ -109,8 +109,9 @@ export function parseRow(raw: RawImportRow, price: PriceSpec | null): ParsedRow 
     const value = priceText === undefined ? null : parseQuantityText(priceText);
     if (priceText === undefined) issues.push('no_price');
     else if (value === null) issues.push('bad_price');
-    else if (value.isZero()) issues.push('zero_price');
     else if (price !== null) {
+      // A zero price is imported as given and flagged for review (product owner, 2026-10-05).
+      if (value.isZero()) issues.push('zero_price');
       const rounded = round(value, price.minorUnits, price.roundingMode);
       parsed.sellPriceRaw = toDecimalString(value);
       parsed.sellPrice = formatFixed(rounded, price.minorUnits);

@@ -54,8 +54,8 @@ are needed later, for opening stock (Sprint 4).
     Arabic-Indic digits are accepted.
   - Selling prices are rounded to the list currency's minor units with the tenant's
     rounding mode. A row whose price changed is flagged `price_rounded`.
-  - A price of zero is not imported. The row is flagged, and the part appears in the
-    "no price" review list.
+  - A price of zero is imported as given and flagged `zero_price` in the preview, so it
+    can be reviewed (product owner's decision, 2026-10-05).
   - Cost and quantity are kept as read.
 - **Row identity** is the normalised part number, name and vehicle code.
   - **Repeats in one file** are merged into the first occurrence (`merge`). If the
