@@ -117,6 +117,7 @@ export interface ImportRows {
   raw: Json;
   row_key: string | null;
   row_number: number;
+  skipped_by_user: Generated<boolean>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
 }

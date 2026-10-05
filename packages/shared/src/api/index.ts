@@ -24,6 +24,12 @@ export const ERROR_CODES = [
   // Would leave the tenant with no active user able to manage users and roles.
   'users.last_admin',
   'device.invalid_code',
+  // Catalog import (ADR 0016).
+  'import.unreadable_file',
+  'import.sheet_not_found',
+  'import.too_many_rows',
+  'import.already_applied',
+  'import.not_editable',
   'server.error',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

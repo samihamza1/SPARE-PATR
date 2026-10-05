@@ -43,7 +43,9 @@ CREATE TABLE import_rows (
   issues     text[] NOT NULL DEFAULT '{}',
   -- Identity across imports: normalised part number + name + vehicle code.
   row_key    text,
-  decision   text CHECK (decision IN ('create', 'update', 'skip')),
+  -- What applying does with the row (ADR 0016); recomputed until the batch is applied.
+  decision   text CHECK (decision IN ('create', 'update', 'merge', 'skip')),
+  skipped_by_user boolean NOT NULL DEFAULT false,
   part_id    uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

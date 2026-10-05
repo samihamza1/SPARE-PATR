@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import type { PlatformDeps } from '../auth/plugin';
 import { ApiError } from '../errors';
 import { authRoutes } from './auth';
+import { importRoutes } from './catalog/imports';
 import { partRoutes } from './catalog/parts';
 import { priceRoutes } from './catalog/prices';
 import { searchRoutes } from './catalog/search';
@@ -40,4 +41,5 @@ export function registerPlatformRoutes(app: FastifyInstance, deps: PlatformDeps)
   partRoutes(app, deps);
   priceRoutes(app, deps);
   searchRoutes(app, deps);
+  importRoutes(app, deps);
 }
