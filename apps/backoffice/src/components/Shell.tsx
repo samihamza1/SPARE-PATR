@@ -13,6 +13,11 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'nav.home' },
+  { to: '/search', label: 'nav.search' },
+  { to: '/catalog/parts', label: 'nav.parts' },
+  { to: '/catalog/vehicles', label: 'nav.vehicles' },
+  { to: '/catalog/setup', label: 'nav.catalogSetup' },
+  { to: '/catalog/imports', label: 'nav.imports', permission: 'catalog.import' },
   { to: '/users', label: 'nav.users', permission: 'users.manage' },
   { to: '/roles', label: 'nav.roles' },
   { to: '/settings', label: 'nav.settings', permission: 'settings.manage' },

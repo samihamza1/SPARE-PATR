@@ -525,10 +525,11 @@ export async function loadBatchDetail(trx: Trx, id: string): Promise<ImportBatch
      GROUP BY parsed->>'vehicleCodeNorm'
      ORDER BY count(*) DESC, 2`.execute(trx);
   const aliases = await trx
-    .selectFrom('vehicle_aliases')
-    .select(['alias_norm', 'target', 'vehicle_id', 'category_id'])
-    .where('removed_at', 'is', null)
-    .where('alias_norm', 'in', codes.length === 0 ? [''] : codes.map((c) => c.code_norm))
+    .selectFrom('vehicle_aliases as a')
+    .leftJoin('vehicles as v', 'v.id', 'a.vehicle_id')
+    .select(['a.alias_norm', 'a.target', 'a.vehicle_id', 'a.category_id', 'v.name as vehicle_name'])
+    .where('a.removed_at', 'is', null)
+    .where('a.alias_norm', 'in', codes.length === 0 ? [''] : codes.map((c) => c.code_norm))
     .execute();
   return {
     ...toBatch(row),
@@ -546,7 +547,9 @@ export async function loadBatchDetail(trx: Trx, id: string): Promise<ImportBatch
                 target: own.some((a) => a.target === 'vehicle')
                   ? 'vehicle'
                   : (first.target as 'category' | 'ignore'),
-                vehicleIds: own.flatMap((a) => a.vehicle_id ?? []),
+                vehicles: own.flatMap((a) =>
+                  a.vehicle_id === null ? [] : [{ id: a.vehicle_id, name: a.vehicle_name ?? '' }],
+                ),
                 categoryId: own.find((a) => a.category_id !== null)?.category_id ?? null,
               },
       };

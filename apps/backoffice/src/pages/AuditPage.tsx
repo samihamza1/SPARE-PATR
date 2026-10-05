@@ -9,7 +9,21 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { useFormatDateTime } from '../format';
 
 const PAGE = 50;
-const ENTITY_TYPES = ['user', 'role', 'session', 'tenant', 'currency', 'device'] as const;
+const ENTITY_TYPES = [
+  'user',
+  'role',
+  'session',
+  'tenant',
+  'currency',
+  'device',
+  'part',
+  'brand',
+  'category',
+  'vehicle',
+  'vehicle_alias',
+  'price_list',
+  'import_batch',
+] as const;
 
 export function AuditPage() {
   const { t } = useTranslation();

@@ -50,17 +50,20 @@ export function Providers({
   i18n,
   children,
   queryClient,
+  env = 'default',
 }: {
   i18n: I18n;
   children: ReactNode;
   queryClient?: QueryClient;
+  /** 'test' turns off Mantine transitions and portals, so tests see dropdowns at once. */
+  env?: 'default' | 'test';
 }) {
   const [client] = useState(() => queryClient ?? createQueryClient());
   return (
     <I18nextProvider i18n={i18n}>
       <DirectionProvider initialDirection={directionOf(i18n.language)} detectDirection={false}>
         <DirectionSync i18n={i18n} />
-        <MantineProvider theme={theme}>
+        <MantineProvider theme={theme} env={env}>
           <Notifications />
           <QueryClientProvider client={client}>
             <AuthProvider>{children}</AuthProvider>

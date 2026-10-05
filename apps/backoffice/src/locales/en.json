@@ -8,7 +8,12 @@
     "roles": "Roles and permissions",
     "settings": "Settings",
     "devices": "Devices",
-    "audit": "Audit log"
+    "audit": "Audit log",
+    "search": "Find a part",
+    "parts": "Parts",
+    "vehicles": "Vehicles",
+    "catalogSetup": "Catalog setup",
+    "imports": "Import catalog"
   },
   "auth": {
     "title": "Sign in",
@@ -196,7 +201,14 @@
       "session": "Sessions",
       "tenant": "Shop",
       "currency": "Currencies",
-      "device": "Devices"
+      "device": "Devices",
+      "part": "Parts",
+      "brand": "Brands",
+      "category": "Categories",
+      "vehicle": "Vehicles",
+      "vehicle_alias": "Vehicle words",
+      "price_list": "Price lists",
+      "import_batch": "Imports"
     },
     "actions": {
       "auth": {
@@ -227,7 +239,299 @@
         "revoke": "Device revoked"
       },
       "session": { "revoke": "Session ended" },
-      "tenant": { "provision": "Shop created" }
+      "tenant": { "provision": "Shop created" },
+      "part": {
+        "create": "Part created",
+        "update": "Part updated",
+        "bulk_update": "Parts updated together",
+        "supersede": "Part replaced"
+      },
+      "part_number": {
+        "add": "Part number added",
+        "remove": "Part number removed"
+      },
+      "fitment": {
+        "add": "Vehicle linked",
+        "remove": "Vehicle unlinked"
+      },
+      "interchange": {
+        "link": "Parts linked as interchangeable",
+        "unlink": "Part left interchange group"
+      },
+      "brand": {
+        "create": "Brand created",
+        "update": "Brand updated"
+      },
+      "category": {
+        "create": "Category created",
+        "update": "Category updated"
+      },
+      "vehicle": {
+        "create": "Vehicle added",
+        "update": "Vehicle updated"
+      },
+      "vehicle_alias": {
+        "create": "Vehicle word added",
+        "remove": "Vehicle word removed"
+      },
+      "price_list": {
+        "create": "Price list created",
+        "update": "Price list updated"
+      },
+      "price": {
+        "set": "Price set"
+      },
+      "catalog": {
+        "import": "Catalog imported",
+        "import_stage": "Import file checked",
+        "import_discard": "Import discarded"
+      }
     }
+  },
+  "search": {
+    "title": "Find a part",
+    "placeholder": "Name, part number, vehicle and year, e.g. front pads land cruiser 2015",
+    "submit": "Search",
+    "noResults": "No parts found",
+    "understood": "Understood as",
+    "year": "Year {{year}}",
+    "number": "Number {{number}}",
+    "matchedBy": {
+      "number": "Part number",
+      "text": "Name",
+      "vehicle": "Vehicle"
+    },
+    "alternatives": "Alternatives",
+    "noAlternatives": "No alternatives",
+    "noPrice": "No price"
+  },
+  "catalog": {
+    "partsTitle": "Parts",
+    "newPart": "New part",
+    "sku": "SKU",
+    "nameAr": "Arabic name",
+    "nameEn": "English name",
+    "name": "Name",
+    "grade": "Quality",
+    "brand": "Brand",
+    "category": "Category",
+    "unit": "Unit",
+    "notes": "Notes",
+    "archived": "Archived",
+    "archive": "Archive",
+    "restore": "Restore",
+    "nameRequired": "Enter an Arabic or an English name",
+    "filter": "Search parts",
+    "needsReview": {
+      "all": "All parts",
+      "ungraded": "No quality grade",
+      "no_price": "No price",
+      "no_fitment": "No vehicle"
+    },
+    "selected": "{{count}} selected",
+    "bulkGrade": "Set quality",
+    "bulkApply": "Apply to selected",
+    "loadMore": "Load more",
+    "empty": "No parts",
+    "gradeLabel": {
+      "oem": "OEM",
+      "premium": "Premium",
+      "good": "Good",
+      "economy": "Economy",
+      "none": "Not graded"
+    },
+    "relation": {
+      "replacement": "Replacement",
+      "interchange": "Interchangeable",
+      "shared_number": "Same OEM number"
+    },
+    "numberKind": {
+      "oem": "OEM",
+      "aftermarket": "Aftermarket",
+      "other": "Other"
+    },
+    "brandKind": {
+      "vehicle_maker": "Vehicle maker",
+      "aftermarket": "Aftermarket"
+    },
+    "level": {
+      "type": "Type",
+      "make": "Make",
+      "model": "Model",
+      "generation": "Generation",
+      "engine": "Engine"
+    },
+    "details": "Details",
+    "numbers": "Part numbers",
+    "number": "Number",
+    "kind": "Kind",
+    "addNumber": "Add number",
+    "fitments": "Fits vehicles",
+    "vehicle": "Vehicle",
+    "note": "Note",
+    "addFitment": "Add vehicle",
+    "remove": "Remove",
+    "interchange": "Interchangeable parts",
+    "linkPart": "Link a part",
+    "unlink": "Leave the group",
+    "choosePart": "Search by SKU, name or number",
+    "supersession": "Replacement",
+    "supersededBy": "Replaced by",
+    "supersedes": "Replaces",
+    "supersede": "Replace with another part",
+    "reason": "Reason",
+    "prices": "Prices",
+    "priceList": "Price list",
+    "price": "Price",
+    "currentPrice": "Current price",
+    "setPrice": "Set price",
+    "effectiveAt": "Effective from",
+    "effectiveNow": "Now",
+    "history": "Price history",
+    "recorded": "Recorded",
+    "source": {
+      "manual": "Manual",
+      "import": "Import"
+    },
+    "noPrice": "No price",
+    "chooseVehicle": "Search vehicles",
+    "back": "Back to parts"
+  },
+  "vehicles": {
+    "title": "Vehicles",
+    "all": "All",
+    "add": "Add here",
+    "local": "This shop",
+    "platform": "Shared",
+    "years": "Years",
+    "yearFrom": "From year",
+    "yearTo": "To year",
+    "engineCode": "Engine code",
+    "displacement": "Displacement (cc)",
+    "fuel": "Fuel",
+    "nameAr": "Arabic name",
+    "children": "Inside {{name}}",
+    "empty": "Nothing here yet",
+    "fuelType": {
+      "petrol": "Petrol",
+      "diesel": "Diesel",
+      "hybrid": "Hybrid",
+      "electric": "Electric",
+      "lpg": "LPG",
+      "cng": "CNG"
+    },
+    "aliases": "Shop words for vehicles",
+    "aliasesHint": "Words your staff and files use, e.g. LC for Land Cruiser. Search and import use them.",
+    "alias": "Word",
+    "target": {
+      "vehicle": "A vehicle",
+      "category": "A category",
+      "ignore": "Ignore"
+    },
+    "mapsTo": "Means",
+    "addAlias": "Add word"
+  },
+  "setup": {
+    "title": "Catalog setup",
+    "brands": "Brands",
+    "categories": "Categories",
+    "priceLists": "Price lists",
+    "add": "Add",
+    "kind": "Kind",
+    "parent": "Parent",
+    "currency": "Currency",
+    "default": "Default",
+    "makeDefault": "Make default",
+    "defaultHint": "Search shows prices from the default list of each currency"
+  },
+  "import": {
+    "title": "Import catalog",
+    "new": "New import",
+    "history": "Earlier imports",
+    "file": "Spreadsheet file (.xlsx or .csv)",
+    "read": "Read file",
+    "privacy": "Only the mapped columns of the chosen sheet are stored. The file itself is not kept.",
+    "steps": {
+      "file": "File",
+      "sheet": "Sheet",
+      "columns": "Columns",
+      "codes": "Vehicle codes",
+      "preview": "Preview"
+    },
+    "sheet": "Sheet",
+    "rows": "{{count}} rows",
+    "headerRow": "Header row",
+    "headerHint": "Click the row that holds the column titles; data starts below it.",
+    "row": "Row",
+    "field": {
+      "sku": "SKU",
+      "partNumber": "Part number",
+      "nameEn": "English name",
+      "nameAr": "Arabic name",
+      "vehicleCode": "Vehicle code",
+      "sellPrice": "Selling price",
+      "cost": "Cost",
+      "quantity": "Quantity"
+    },
+    "column": "Column",
+    "notMapped": "Not in this file",
+    "numberKind": "The part numbers are",
+    "priceList": "Selling price goes to list",
+    "costCurrency": "Cost currency",
+    "skuPrefix": "SKU prefix",
+    "skuPrefixHint": "New parts get PREFIX-00001, PREFIX-00002, ... (capital letters and digits)",
+    "stage": "Check rows",
+    "codesHint": "Tell the system what each code in the file means. Codes the shop already uses are mapped.",
+    "code": "Code",
+    "mapping": "Means",
+    "unmapped": "Not mapped",
+    "mapCode": "Map",
+    "analyse": "Refresh preview",
+    "decision": {
+      "create": "New part",
+      "update": "Update earlier part",
+      "merge": "Same as an earlier row",
+      "skip": "Skip"
+    },
+    "issue": {
+      "empty_row": "Empty row",
+      "no_name": "No name",
+      "bad_sku": "Invalid SKU",
+      "sku_taken": "SKU already used",
+      "no_part_number": "No part number",
+      "no_price": "No price",
+      "zero_price": "Price is zero (not imported)",
+      "bad_price": "Unreadable price",
+      "price_rounded": "Price rounded",
+      "bad_cost": "Unreadable cost",
+      "bad_quantity": "Unreadable quantity",
+      "vehicle_unmapped": "Vehicle code not mapped",
+      "price_conflict": "Different price than the first row",
+      "duplicate_row": "Repeated row",
+      "shared_number": "Number shared with other parts",
+      "existing_part": "Imported before"
+    },
+    "next": "Next",
+    "result": "Result",
+    "allRows": "All rows",
+    "skip": "Skip",
+    "unskip": "Include",
+    "skippedByUser": "Skipped by you",
+    "apply": "Import now",
+    "applyConfirm": "Import {{count}} rows into the catalog? This cannot be undone, but parts can be archived later.",
+    "applied": "Imported",
+    "discard": "Discard",
+    "discardConfirm": "Discard this import?",
+    "summary": "Summary",
+    "pricesSet": "Prices set",
+    "fitmentsAdded": "Vehicle links added",
+    "openParts": "Review the parts",
+    "status": {
+      "draft": "Draft",
+      "previewed": "Checked",
+      "applied": "Imported",
+      "discarded": "Discarded"
+    },
+    "createdAt": "Started"
   }
 }

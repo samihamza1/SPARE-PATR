@@ -83,14 +83,21 @@ describe('shell and permissions', () => {
     const links = within(nav)
       .getAllByRole('link')
       .map((a) => a.textContent);
-    expect(links).toEqual([ar.nav.home, ar.nav.roles]);
+    expect(links).toEqual([
+      ar.nav.home,
+      ar.nav.search,
+      ar.nav.parts,
+      ar.nav.vehicles,
+      ar.nav.catalogSetup,
+      ar.nav.roles,
+    ]);
   });
 
   it('shows every page to the owner', async () => {
     new FakeApi().on('GET /auth/me', { status: 200, body: me(ALL) }).install();
     await renderApp('/');
     const nav = await screen.findByRole('navigation', { name: ar.nav.menu });
-    expect(within(nav).getAllByRole('link')).toHaveLength(6);
+    expect(within(nav).getAllByRole('link')).toHaveLength(11);
   });
 
   it('signs out to the login page, and the next user starts at home', async () => {

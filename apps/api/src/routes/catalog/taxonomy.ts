@@ -51,16 +51,25 @@ async function loadCategories(trx: Trx, id?: string): Promise<Category[]> {
 
 async function loadAliases(trx: Trx, id?: string): Promise<VehicleAlias[]> {
   let q = trx
-    .selectFrom('vehicle_aliases')
-    .select(['id', 'alias', 'target', 'vehicle_id', 'category_id'])
-    .where('removed_at', 'is', null)
-    .orderBy('alias');
-  if (id !== undefined) q = q.where('id', '=', id);
+    .selectFrom('vehicle_aliases as a')
+    .leftJoin('vehicles as v', 'v.id', 'a.vehicle_id')
+    .select([
+      'a.id',
+      'a.alias',
+      'a.target',
+      'a.vehicle_id',
+      'a.category_id',
+      'v.name as vehicle_name',
+    ])
+    .where('a.removed_at', 'is', null)
+    .orderBy('a.alias');
+  if (id !== undefined) q = q.where('a.id', '=', id);
   return (await q.execute()).map((a) => ({
     id: a.id,
     alias: a.alias,
     target: a.target as VehicleAlias['target'],
     vehicleId: a.vehicle_id,
+    vehicleName: a.vehicle_name,
     categoryId: a.category_id,
   }));
 }

@@ -189,7 +189,7 @@ export const importVehicleCodeSchema = z.object({
   mapping: z
     .object({
       target: z.enum(['vehicle', 'category', 'ignore']),
-      vehicleIds: z.array(uuidSchema),
+      vehicles: z.array(z.object({ id: uuidSchema, name: z.string() })),
       categoryId: uuidSchema.nullable(),
     })
     .nullable(),
