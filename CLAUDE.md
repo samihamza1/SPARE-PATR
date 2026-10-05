@@ -88,3 +88,5 @@ marketing CRM, VIN decoding, e-invoicing connectors.
 - `pnpm db:migrate` | `pnpm db:new <name>` | `pnpm db:codegen` (run after every migration, commit the output)
 - `pnpm tenant:create --slug … --currency … --rounding … --negative-stock allow|deny …`
   provisions a tenant (owner role; every value required, see apps/api/src/cli/tenant-create.ts)
+- `pnpm catalog:seed-synthetic --parts 50000` creates a new synthetic shop with a generated
+  catalog (test data only); `pnpm --filter @autoparts/api test:perf` measures search p95
