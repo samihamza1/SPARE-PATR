@@ -79,6 +79,13 @@
       "last_admin": "Not possible: at least one administrator must keep managing users and roles"
     },
     "device": { "invalid_code": "The enrollment code is wrong or has expired" },
+    "import": {
+      "unreadable_file": "The file could not be read; use .xlsx or .csv (UTF-8)",
+      "sheet_not_found": "That sheet is not in the file",
+      "too_many_rows": "The sheet has too many rows for one import",
+      "already_applied": "This sheet of this file was already imported",
+      "not_editable": "This import was already applied or discarded"
+    },
     "server": { "error": "Something went wrong" }
   },
   "permissions": {
