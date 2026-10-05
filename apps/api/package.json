@@ -10,6 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "tenant:create": "tsx src/cli/tenant-create.ts",
+    "catalog:seed-synthetic": "tsx src/cli/catalog-seed-synthetic.ts",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {

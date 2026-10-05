@@ -37,3 +37,4 @@ Template:
 | [0013](0013-shared-vehicle-tree.md)         | Shared vehicle tree: shared tables under RLS                |
 | [0014](0014-catalog-model.md)               | Catalog model                                               |
 | [0015](0015-catalog-search.md)              | Catalog search                                              |
+| [0016](0016-catalog-import.md)              | Catalog import from spreadsheets                            |
