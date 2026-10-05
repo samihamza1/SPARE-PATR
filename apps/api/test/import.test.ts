@@ -128,7 +128,8 @@ describe('parsing a row', () => {
       'no_part_number',
       'no_price',
     ]);
-    expect(row(['1', 'N70', 'Battery', null, null, '0', null, '0']).issues).toEqual(['zero_price']);
+    const zero = row(['1', 'N70', 'Battery', null, null, '0', null, '0']);
+    expect([zero.issues, zero.parsed.sellPrice]).toEqual([['zero_price'], '0.00']);
     // "1,200" could be 1200 or 1.2: refused, not guessed.
     expect(row(['1', 'N70', 'Battery', null, null, '1,200', 'x', '-1']).issues).toEqual([
       'bad_price',

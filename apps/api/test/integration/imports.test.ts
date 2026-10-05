@@ -298,8 +298,8 @@ describe('catalog import', () => {
     expect(res.statusCode, res.body).toBe(200);
     const applied = res.json<ImportBatchDetail>();
     expect(applied.status).toBe('applied');
-    // Four prices (the zero price is not imported); LC fitments for the filter and the pad.
-    expect(applied.stats).toMatchObject({ pricesSet: 4, fitmentsAdded: 2 });
+    // Five prices (a zero price is imported as 0.00); LC fitments for the filter and the pad.
+    expect(applied.stats).toMatchObject({ pricesSet: 5, fitmentsAdded: 2 });
 
     const parts = (await owner.get('/catalog/parts?limit=50')).json<PartSummary[]>();
     expect(parts.map((p) => [p.sku, p.nameEn, p.qualityGrade])).toEqual([
@@ -317,8 +317,8 @@ describe('catalog import', () => {
     expect(pad.numbers.map((x) => [x.number, x.kind])).toEqual([['04465-60320', 'oem']]);
     const battery = (await owner.get(`/catalog/parts/${parts[2]?.id ?? ''}`)).json<PartDetail>();
     expect(battery.categoryId).toBe(batteries);
-    // Zero price: not imported as a price; the part waits in the "no price" review list.
-    expect(battery.prices[0]?.current).toBeNull();
+    // A zero price is imported as given (and was flagged in the preview).
+    expect(battery.prices[0]?.current).toEqual({ amount: '0.00', currency: 'AAA' });
 
     const links = await rowsOf(owner, batch.id);
     expect(links[0]?.partId).toBe(parts[0]?.id);

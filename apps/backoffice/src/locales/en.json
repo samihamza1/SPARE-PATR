@@ -500,7 +500,7 @@
       "sku_taken": "SKU already used",
       "no_part_number": "No part number",
       "no_price": "No price",
-      "zero_price": "Price is zero (not imported)",
+      "zero_price": "Price is zero",
       "bad_price": "Unreadable price",
       "price_rounded": "Price rounded",
       "bad_cost": "Unreadable cost",
