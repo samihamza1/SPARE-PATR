@@ -221,7 +221,8 @@
         "update": "User updated",
         "archive": "User archived",
         "password_reset": "Password set by admin",
-        "password_change": "Password changed"
+        "password_change": "Password changed",
+        "password_change_failed": "Wrong current password on password change"
       },
       "role": {
         "create": "Role created",

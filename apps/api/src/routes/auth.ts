@@ -27,6 +27,9 @@ const invalidCredentials = () => new ApiError(401, 'auth.invalid_credentials');
 /** Per (IP, shop, username): slows guessing without letting one IP lock out a whole shop. */
 const LOGIN_RATE_LIMIT = { max: 10, timeWindow: '1 minute' } as const;
 
+/** Per user: people change their password rarely; caps the Argon2 work one session can cause. */
+const PASSWORD_CHANGE_RATE_LIMIT = { max: 5, timeWindow: '1 minute' } as const;
+
 export async function resolveTenant(db: Kysely<DB>, slug: string): Promise<string | null> {
   const { rows } = await sql<{
     id: string | null;
@@ -204,41 +207,101 @@ export function authRoutes(
 
   r.post(
     '/me/password',
-    { schema: { body: changeOwnPasswordSchema }, config: { access: 'authenticated' } },
+    {
+      schema: { body: changeOwnPasswordSchema },
+      // Checks a password like sign-in does: the same per-IP bucket, plus a per-user limit.
+      preHandler: credentialThrottle,
+      config: {
+        access: 'authenticated',
+        rateLimit: {
+          ...PASSWORD_CHANGE_RATE_LIMIT,
+          hook: 'preHandler',
+          keyGenerator: (req) => {
+            const auth = authOf(req);
+            return `password-change|${auth.tenantId}|${auth.userId}`;
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const auth = authOf(request);
       const now = deps.now();
-      const current = await inTenant(deps, request, (trx) =>
-        trx
-          .selectFrom('users')
-          .select('password_hash')
-          .where('id', '=', auth.userId)
-          .executeTakeFirstOrThrow(),
-      );
-      if (!(await verifyPassword(current.password_hash, request.body.currentPassword))) {
-        throw new ApiError(400, 'auth.wrong_password');
-      }
-      const hash = await hashPassword(request.body.newPassword);
-      await inTenant(deps, request, async (trx) => {
-        await trx
-          .updateTable('users')
-          .set({ password_hash: hash, password_changed_at: now })
-          .where('id', '=', auth.userId)
-          .execute();
-        await revokeSessions(
-          trx,
-          { userId: auth.userId, exceptSessionId: auth.sessionId },
-          'password_changed',
+      const current = await inTenant(deps, request, async (trx) => ({
+        hash: (
+          await trx
+            .selectFrom('users')
+            .select('password_hash')
+            .where('id', '=', auth.userId)
+            .executeTakeFirstOrThrow()
+        ).password_hash,
+        settings: (await trx.selectFrom('tenants').select('settings').executeTakeFirstOrThrow())
+          .settings,
+      }));
+      // Argon2 (verify, then hash) runs outside any transaction.
+      const ok = await verifyPassword(current.hash, request.body.currentPassword);
+      const newHash = ok ? await hashPassword(request.body.newPassword) : null;
+
+      const outcome = await inTenant(deps, request, async (trx) => {
+        if (newHash !== null && current.hash !== null) {
+          // Only while the password is still the one just verified.
+          const changed = await trx
+            .updateTable('users')
+            .set({ password_hash: newHash, password_changed_at: now })
+            .where('id', '=', auth.userId)
+            .where('password_hash', '=', current.hash)
+            .executeTakeFirst();
+          if (changed.numUpdatedRows > 0n) {
+            await revokeSessions(
+              trx,
+              { userId: auth.userId, exceptSessionId: auth.sessionId },
+              'password_changed',
+              now,
+            );
+            await audit(
+              trx,
+              actorOf(request),
+              { action: 'user.password_change', entityType: 'user', entityId: auth.userId },
+              now,
+            );
+            return 'changed';
+          }
+        }
+        // A wrong current password counts toward the sign-in lockout (ADR 0017).
+        const attempt = await recordPasswordAttempt(trx, {
+          userId: auth.userId,
+          passwordOk: false,
+          verifiedHash: current.hash,
+          settings: current.settings,
           now,
-        );
+        });
+        const locked = attempt?.locked ?? false;
+        // Whoever holds this session may be guessing: once the account locks, end them all.
+        if (locked) await revokeSessions(trx, { userId: auth.userId }, 'locked_out', now);
+        const failure = { reason: 'wrong_password', locked, ip: request.ip };
         await audit(
           trx,
           actorOf(request),
-          { action: 'user.password_change', entityType: 'user', entityId: auth.userId },
+          {
+            action: 'user.password_change_failed',
+            entityType: 'user',
+            entityId: auth.userId,
+            after: failure,
+          },
           now,
         );
+        if (locked && attempt?.wasLocked === false) {
+          await audit(
+            trx,
+            actorOf(request),
+            { action: 'auth.lockout', entityType: 'user', entityId: auth.userId, after: failure },
+            now,
+          );
+        }
+        return locked ? 'locked' : 'wrong';
       });
-      return reply.code(204).send();
+      if (outcome === 'changed') return reply.code(204).send();
+      if (outcome === 'locked') void reply.clearCookie(SESSION_COOKIE, { path: '/' });
+      throw new ApiError(400, 'auth.wrong_password');
     },
   );
 }
