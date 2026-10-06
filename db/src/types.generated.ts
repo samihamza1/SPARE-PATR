@@ -9,6 +9,8 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
+export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
 export type Json = JsonValue;
 
 export type JsonArray = JsonValue[];
@@ -71,6 +73,7 @@ export interface Devices {
   enrollment_expires_at: Timestamp | null;
   id: string;
   last_seen_at: Timestamp | null;
+  location_id: string | null;
   name: string;
   revoked_at: Timestamp | null;
   revoked_by: string | null;
@@ -87,6 +90,18 @@ export interface Fitments {
   supersession_id: string | null;
   tenant_id: string;
   vehicle_id: string;
+}
+
+export interface FxRates {
+  base_currency: string;
+  id: string;
+  note: string | null;
+  quote_currency: string;
+  rate: Numeric;
+  rate_date: Timestamp;
+  recorded_at: Generated<Timestamp>;
+  recorded_by: string;
+  tenant_id: string;
 }
 
 export interface ImportBatches {
@@ -137,6 +152,27 @@ export interface InterchangeMembers {
   part_id: string;
   removed_at: Timestamp | null;
   tenant_id: string;
+}
+
+export interface LedgerQueue {
+  created_at: Generated<Timestamp>;
+  document_id: string;
+  event: string;
+  id: string;
+  payload: Json;
+  tenant_id: string;
+}
+
+export interface Locations {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: string;
+  is_default: Generated<boolean>;
+  kind: string;
+  name: string;
+  sort_order: Generated<number>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface PartNumbers {
@@ -219,6 +255,80 @@ export interface Sessions {
   tenant_id: string;
   user_agent: string | null;
   user_id: string;
+}
+
+export interface StockBalances {
+  last_in_at: Timestamp | null;
+  last_out_at: Timestamp | null;
+  location_id: string;
+  part_id: string;
+  quantity: Generated<number>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface StockCosts {
+  last_move_id: string | null;
+  part_id: string;
+  quantity: Generated<number>;
+  ref_quantity: number | null;
+  ref_value: Numeric | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  value: Generated<Numeric>;
+}
+
+export interface StockDocuments {
+  device_id: string | null;
+  id: string;
+  kind: string;
+  note: string | null;
+  occurred_at: Timestamp;
+  origin: string;
+  posted_at: Generated<Timestamp>;
+  posted_by: string;
+  request_hash: Buffer;
+  tenant_id: string;
+}
+
+export interface StockMoves {
+  amount: Numeric;
+  cost_known: Generated<boolean>;
+  currency: string;
+  document_id: string;
+  functional_amount: Numeric;
+  fx_base: string;
+  fx_quote: string;
+  fx_rate: Numeric;
+  fx_rate_id: string | null;
+  id: string;
+  kind: string;
+  line_no: number;
+  location_id: string | null;
+  occurred_at: Timestamp;
+  part_id: string;
+  prev_location_quantity: number | null;
+  prev_part_quantity: number;
+  prev_part_value: Numeric;
+  quantity: number;
+  reason: string | null;
+  recorded_at: Generated<Timestamp>;
+  seq: Generated<Int8>;
+  tenant_id: string;
+}
+
+export interface StockReviewItems {
+  id: string;
+  kind: string;
+  location_id: string | null;
+  move_id: string;
+  opened_at: Generated<Timestamp>;
+  part_id: string;
+  resolution_document_id: string | null;
+  resolution_note: string | null;
+  resolved_at: Timestamp | null;
+  resolved_by: string | null;
+  tenant_id: string;
 }
 
 export interface Supersessions {
@@ -329,16 +439,24 @@ export interface DB {
   categories: Categories;
   devices: Devices;
   fitments: Fitments;
+  fx_rates: FxRates;
   import_batches: ImportBatches;
   import_rows: ImportRows;
   interchange_groups: InterchangeGroups;
   interchange_members: InterchangeMembers;
+  ledger_queue: LedgerQueue;
+  locations: Locations;
   part_numbers: PartNumbers;
   part_prices: PartPrices;
   parts: Parts;
   price_lists: PriceLists;
   roles: Roles;
   sessions: Sessions;
+  stock_balances: StockBalances;
+  stock_costs: StockCosts;
+  stock_documents: StockDocuments;
+  stock_moves: StockMoves;
+  stock_review_items: StockReviewItems;
   supersessions: Supersessions;
   tenant_currencies: TenantCurrencies;
   tenant_directory: TenantDirectory;
