@@ -91,6 +91,24 @@
       "already_applied": "This sheet of this file was already imported",
       "not_editable": "This import was already applied or discarded"
     },
+    "settings": { "incomplete": "A business rule for this is not set yet; set it in Settings" },
+    "location": {
+      "archived": "That location is archived, or it is the default shop",
+      "has_devices": "Move the devices of this location to another shop first",
+      "not_a_shop": "Only a shop can sell or be the default location"
+    },
+    "fx": {
+      "rate_missing": "No exchange rate is recorded for this currency and date",
+      "future_date": "The date cannot be in the future"
+    },
+    "stock": {
+      "insufficient": "Not enough stock at that location",
+      "concurrent_change": "Stock changed at the same moment; try again",
+      "has_stock": "Not possible while there is stock",
+      "cost_required": "Enter a unit cost: this part has no known cost yet",
+      "review_unresolved": "Not resolved yet: the stock is still below zero or has no cost"
+    },
+    "idempotency": { "conflict": "This document was already sent with different content" },
     "server": { "error": "Something went wrong" }
   },
   "permissions": {
