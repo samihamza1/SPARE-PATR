@@ -11,7 +11,7 @@ import { audit } from '../audit';
 import type { PlatformDeps } from '../auth/plugin';
 import { notFound } from '../errors';
 import type { Trx } from './common';
-import { actorOf, assertAdminRemains, inTenant } from './common';
+import { actorOf, assertAdminRemains, inTenant, lockAdminChanges, privilegeGuard } from './common';
 
 async function loadRoles(trx: Trx, id?: string): Promise<Role[]> {
   let q = trx
@@ -46,6 +46,8 @@ export function roleRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     async (request, reply) => {
       const role = await inTenant(deps, request, async (trx, auth) => {
         const b = request.body;
+        await lockAdminChanges(trx, auth.tenantId);
+        (await privilegeGuard(trx, auth)).permissions(b.permissions);
         await trx
           .insertInto('roles')
           .values({
@@ -73,11 +75,16 @@ export function roleRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     '/roles/:id',
     { schema: { params: idParamsSchema, body: updateRoleSchema }, config: { access } },
     (request) =>
-      inTenant(deps, request, async (trx) => {
+      inTenant(deps, request, async (trx, auth) => {
         const { id } = request.params;
+        await lockAdminChanges(trx, auth.tenantId);
         const [before] = await loadRoles(trx, id);
         if (before === undefined) throw notFound();
         const b = request.body;
+        // Only roles within the actor's own permissions, and only to such a set.
+        const guard = await privilegeGuard(trx, auth);
+        await guard.role(id);
+        if (b.permissions !== undefined) guard.permissions(b.permissions);
         await trx
           .updateTable('roles')
           .set({

@@ -17,7 +17,14 @@ import { revokeSessions } from '../auth/sessions';
 import { ApiError, notFound } from '../errors';
 import { hashPassword } from '../security/password';
 import type { Trx } from './common';
-import { actorOf, assertAdminRemains, inTenant, iso } from './common';
+import {
+  actorOf,
+  assertAdminRemains,
+  inTenant,
+  iso,
+  lockAdminChanges,
+  privilegeGuard,
+} from './common';
 
 const USER_COLUMNS = [
   'id',
@@ -103,9 +110,11 @@ export function userRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     '/users/:id',
     { schema: { params: idParamsSchema, body: updateUserSchema }, config: { access } },
     (request) =>
-      inTenant(deps, request, async (trx) => {
+      inTenant(deps, request, async (trx, auth) => {
         const { id } = request.params;
+        await lockAdminChanges(trx, auth.tenantId);
         const before = await loadUser(trx, id);
+        await (await privilegeGuard(trx, auth)).user(id);
         const b = request.body;
         await trx
           .updateTable('users')
@@ -136,7 +145,9 @@ export function userRoutes(app: FastifyInstance, deps: PlatformDeps): void {
         // Archiving yourself would end your own session mid-request; ask another admin.
         if (id === auth.userId) throw new ApiError(409, 'resource.conflict');
         const now = deps.now();
+        await lockAdminChanges(trx, auth.tenantId);
         const before = await loadUser(trx, id);
+        await (await privilegeGuard(trx, auth)).user(id);
         if (before.archivedAt !== null) return before;
         await trx.updateTable('users').set({ archived_at: now }).where('id', '=', id).execute();
         await revokeSessions(trx, { userId: id }, 'user_archived', now);
@@ -158,9 +169,12 @@ export function userRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     async (request, reply) => {
       const hash = await hashPassword(request.body.password);
       const now = deps.now();
-      await inTenant(deps, request, async (trx) => {
+      await inTenant(deps, request, async (trx, auth) => {
         const { id } = request.params;
+        await lockAdminChanges(trx, auth.tenantId);
         await loadUser(trx, id);
+        // Setting the password of someone with more permissions would be a takeover.
+        await (await privilegeGuard(trx, auth)).user(id);
         await trx
           .updateTable('users')
           .set({
@@ -191,8 +205,12 @@ export function userRoutes(app: FastifyInstance, deps: PlatformDeps): void {
         const { id } = request.params;
         const { roleId } = request.body;
         const now = deps.now();
+        await lockAdminChanges(trx, auth.tenantId);
         const before = await loadUser(trx, id);
         if (before.archivedAt !== null) throw notFound();
+        const guard = await privilegeGuard(trx, auth);
+        await guard.user(id);
+        await guard.role(roleId);
         const grantId = newId();
         await trx
           .insertInto('user_roles')
@@ -226,7 +244,11 @@ export function userRoutes(app: FastifyInstance, deps: PlatformDeps): void {
       inTenant(deps, request, async (trx, auth) => {
         const { id, roleId } = request.params;
         const now = deps.now();
+        await lockAdminChanges(trx, auth.tenantId);
         const before = await loadUser(trx, id);
+        const guard = await privilegeGuard(trx, auth);
+        await guard.user(id);
+        await guard.role(roleId);
         const result = await trx
           .updateTable('user_roles')
           .set({ revoked_at: now, revoked_by: auth.userId })
