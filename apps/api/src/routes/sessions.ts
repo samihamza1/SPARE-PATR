@@ -6,6 +6,7 @@ import type { PlatformDeps } from '../auth/plugin';
 import { authOf } from '../auth/plugin';
 import { revokeSessions } from '../auth/sessions';
 import { forbidden, notFound } from '../errors';
+import { seesCost, withoutCost } from '../inventory/cost-view';
 import type { Trx } from './common';
 import { actorOf, inTenant, iso } from './common';
 
@@ -91,8 +92,10 @@ export function sessionRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     '/audit-log',
     { schema: { querystring: auditQuerySchema }, config: { access: 'audit.read' } },
     (request) =>
-      inTenant(deps, request, async (trx) => {
+      inTenant(deps, request, async (trx, auth) => {
         const q = request.query;
+        // Supervisors read the log; only cost.view shows stock values in it (ADR 0022).
+        const hide = !seesCost(auth);
         let query = trx
           .selectFrom('audit_log')
           .select([
@@ -119,8 +122,8 @@ export function sessionRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           action: e.action,
           entityType: e.entity_type,
           entityId: e.entity_id,
-          before: e.before,
-          after: e.after,
+          before: hide ? withoutCost(e.before) : e.before,
+          after: hide ? withoutCost(e.after) : e.after,
           reason: e.reason,
         }));
       }),

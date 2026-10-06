@@ -38,6 +38,7 @@ try {
     defaultLocale: 'ar',
     functionalCurrency: { code: 'AAA', minorUnits: 2 },
     settings: { money: { roundingMode: 'HALF_EVEN' }, inventory: { allowNegativeStock: false } },
+    locationName: 'Main shop',
     owner: { username: 'owner', displayName: 'Synthetic owner', password },
   });
   const started = Date.now();
