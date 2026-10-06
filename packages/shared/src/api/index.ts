@@ -34,6 +34,19 @@ export const ERROR_CODES = [
   'import.file_too_large',
   'import.already_applied',
   'import.not_editable',
+  // Inventory (ADRs 0018-0021).
+  'settings.incomplete',
+  'location.archived',
+  'location.has_devices',
+  'location.not_a_shop',
+  'fx.rate_missing',
+  'fx.future_date',
+  'stock.insufficient',
+  'stock.concurrent_change',
+  'stock.has_stock',
+  'stock.cost_required',
+  'stock.review_unresolved',
+  'idempotency.conflict',
   'server.error',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -201,6 +214,8 @@ export const updateCurrencySchema = z
 export const deviceSchema = z.object({
   id: uuidSchema,
   name: z.string(),
+  /** The shop it sells from (ADR 0018). */
+  locationId: uuidSchema.nullable(),
   enrolledAt: timestampSchema.nullable(),
   enrollmentExpiresAt: timestampSchema.nullable(),
   lastSeenAt: timestampSchema.nullable(),
@@ -211,6 +226,8 @@ export type Device = z.infer<typeof deviceSchema>;
 export const createDeviceSchema = z.object({
   id: uuidV7Schema,
   name: z.string().trim().min(1).max(100),
+  /** Defaults to the tenant's default shop. */
+  locationId: uuidSchema.optional(),
 });
 
 export const createDeviceResponseSchema = z.object({

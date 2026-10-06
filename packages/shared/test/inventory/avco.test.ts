@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { AvcoContext, CostState } from '../../src/inventory';
-import { EMPTY_COST_STATE, issueCost, receiveCost, unitCost } from '../../src/inventory';
+import { EMPTY_COST_STATE, applyMove, issueCost, receiveCost, unitCost } from '../../src/inventory';
 import { dec } from '../../src/money';
 import { roundingModeArb, scaledDecimalArb } from '../money/arbitraries';
 
@@ -186,6 +186,29 @@ describe('AVCO properties', () => {
         const { s } = run(ops, c);
         if (s.quantity <= 0) return;
         expect(issueCost(s, s.quantity, c).state.value).toBe('0.00');
+      }),
+    );
+  });
+
+  it('the moves the API posts, applied like the database trigger, reach the same state', () => {
+    // A receipt that covers a shortfall posts its cost adjustment first, then the receipt.
+    fc.assert(
+      fc.property(fc.array(opArb, { maxLength: 40 }), ctxArb, (ops, c) => {
+        let s = EMPTY_COST_STATE;
+        for (const op of ops) {
+          if (op.kind === 'in') {
+            const r = receiveCost(s, op.qty, op.value, c);
+            let t = s;
+            if (r.adjustment !== '0.00') t = applyMove(t, 0, r.adjustment, c);
+            t = applyMove(t, op.qty, op.value, c);
+            expect(t).toEqual(r.state);
+            s = r.state;
+          } else {
+            const r = issueCost(s, op.qty, c);
+            expect(applyMove(s, -op.qty, dec(r.cost).neg().toFixed(2), c)).toEqual(r.state);
+            s = r.state;
+          }
+        }
       }),
     );
   });

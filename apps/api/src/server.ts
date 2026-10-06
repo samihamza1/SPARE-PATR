@@ -10,6 +10,7 @@ import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import './auth/context';
 import { registerAuth } from './auth/plugin';
 import type { PlatformDeps } from './auth/plugin';
+import type { ErrorCode } from '@autoparts/shared';
 import { ApiError } from './errors';
 import { registerPlatformRoutes } from './routes';
 
@@ -23,6 +24,16 @@ export interface ServerDeps {
 const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
 const PG_CHECK_VIOLATION = '23514';
+
+/** SQLSTATEs raised by the stock triggers (ADR 0020) and what the client is told. */
+const STOCK_ERRORS: Record<string, { status: number; code: ErrorCode }> = {
+  // A move was computed from a state that changed: safe to retry.
+  '40001': { status: 409, code: 'stock.concurrent_change' },
+  ST001: { status: 409, code: 'stock.insufficient' },
+  ST002: { status: 409, code: 'location.archived' },
+  ST003: { status: 409, code: 'stock.has_stock' },
+  ST004: { status: 409, code: 'stock.review_unresolved' },
+};
 
 export function buildServer(deps: ServerDeps, options: FastifyServerOptions = {}): FastifyInstance {
   const app = Fastify(options);
@@ -41,6 +52,10 @@ export function buildServer(deps: ServerDeps, options: FastifyServerOptions = {}
       return reply.code(400).send({ error: { code: 'request.invalid', issues } });
     }
     const pgCode = (error as { code?: unknown }).code;
+    const stockError = typeof pgCode === 'string' ? STOCK_ERRORS[pgCode] : undefined;
+    if (stockError !== undefined) {
+      return reply.code(stockError.status).send({ error: { code: stockError.code } });
+    }
     if (pgCode === PG_UNIQUE_VIOLATION) {
       return reply.code(409).send({ error: { code: 'resource.conflict' } });
     }

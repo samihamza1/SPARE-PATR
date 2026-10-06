@@ -32,6 +32,8 @@ export const provisionInputSchema = z.object({
     cashIncrement: decimalStringSchema.nullish(),
   }),
   settings: tenantSettingsSchema,
+  /** The default shop, where devices sell from (ADR 0018); more are added later. */
+  locationName: z.string().trim().min(1).max(100),
   owner: z.object({
     username: z.string().trim().min(1).max(100),
     displayName: z.string().trim().min(1).max(200),
@@ -84,6 +86,17 @@ export async function provisionTenant(
         code: input.functionalCurrency.code,
         minor_units: input.functionalCurrency.minorUnits,
         cash_increment: input.functionalCurrency.cashIncrement ?? null,
+      })
+      .execute();
+
+    await trx
+      .insertInto('locations')
+      .values({
+        id: newId(),
+        tenant_id: tenantId,
+        name: input.locationName,
+        kind: 'shop',
+        is_default: true,
       })
       .execute();
 
