@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
+import { ME_KEY } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 
 interface SettingsResponse {
@@ -44,6 +45,8 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
     mutationFn: () => api<SettingsResponse>('PUT', '/settings', { name, defaultLocale, settings }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      // The header shows the shop name from `me`.
+      await queryClient.invalidateQueries({ queryKey: ME_KEY });
       notifications.show({ message: t('common.saved'), color: 'green' });
     },
   });

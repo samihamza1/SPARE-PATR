@@ -17,7 +17,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
-import { useAuth } from '../auth';
+import { ME_KEY, useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { useFormatDateTime } from '../format';
 import { roleLabel } from './RolesPage';
@@ -83,6 +83,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
 
 function RolesModal({ user, roles, onClose }: { user: User; roles: Role[]; onClose: () => void }) {
   const { t } = useTranslation();
+  const { me } = useAuth();
   const queryClient = useQueryClient();
   // Shown immediately; reverted if the API refuses (e.g. removing the last administrator).
   const [checked, setChecked] = useState(() => new Set(user.roleIds));
@@ -91,9 +92,11 @@ function RolesModal({ user, roles, onClose }: { user: User; roles: Role[]; onClo
       grant
         ? api<User>('POST', `/users/${user.id}/roles`, { roleId })
         : api<User>('POST', `/users/${user.id}/roles/${roleId}/revoke`),
-    onSuccess: (updated) => {
+    onSuccess: async (updated) => {
       setChecked(new Set(updated.roleIds));
-      return queryClient.invalidateQueries({ queryKey: USERS_KEY });
+      await queryClient.invalidateQueries({ queryKey: USERS_KEY });
+      // Own roles changed: the menu and the pages follow the new permissions at once.
+      if (user.id === me?.user.id) await queryClient.invalidateQueries({ queryKey: ME_KEY });
     },
     onError: () => {
       setChecked(new Set(user.roleIds));

@@ -16,7 +16,7 @@ import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
-import { useAuth } from '../auth';
+import { ME_KEY, useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 
 const ROLES_KEY = ['roles'] as const;
@@ -87,7 +87,7 @@ export function RolesPage() {
       api<Role>('PATCH', `/roles/${role.id}`, { permissions }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ROLES_KEY });
-      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      await queryClient.invalidateQueries({ queryKey: ME_KEY });
     },
   });
 
