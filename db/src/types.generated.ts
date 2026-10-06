@@ -174,6 +174,39 @@ export interface Locations {
   updated_at: Generated<Timestamp>;
 }
 
+export interface OpeningStockDrafts {
+  as_of: Timestamp;
+  batch_id: string;
+  cost_currency: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  fx_rate_id: string | null;
+  id: string;
+  location_id: string;
+  posted_at: Timestamp | null;
+  posted_by: string | null;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface OpeningStockLines {
+  amount: Numeric | null;
+  cost_source: string | null;
+  draft_id: string;
+  exclusion: string | null;
+  file_cost_total: Numeric | null;
+  file_quantity: Numeric | null;
+  part_id: string;
+  quantity: number | null;
+  rows: number;
+  status: Generated<string | null>;
+  suggested_unit_cost: Numeric | null;
+  tenant_id: string;
+  unit_cost: Numeric | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface PartNumbers {
   brand_id: string | null;
   created_at: Generated<Timestamp>;
@@ -275,6 +308,31 @@ export interface StockCosts {
   tenant_id: string;
   updated_at: Generated<Timestamp>;
   value: Generated<Numeric>;
+}
+
+export interface StockCountLines {
+  count_id: string;
+  counted: number | null;
+  counted_at: Timestamp | null;
+  counted_by: string | null;
+  expected: number | null;
+  part_id: string;
+  tenant_id: string;
+}
+
+export interface StockCounts {
+  category_id: string | null;
+  closed_at: Timestamp | null;
+  closed_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  document_id: string | null;
+  id: string;
+  location_id: string;
+  note: string | null;
+  scope: string;
+  status: Generated<string>;
+  tenant_id: string;
 }
 
 export interface StockDocuments {
@@ -445,6 +503,8 @@ export interface DB {
   interchange_members: InterchangeMembers;
   ledger_queue: LedgerQueue;
   locations: Locations;
+  opening_stock_drafts: OpeningStockDrafts;
+  opening_stock_lines: OpeningStockLines;
   part_numbers: PartNumbers;
   part_prices: PartPrices;
   parts: Parts;
@@ -453,6 +513,8 @@ export interface DB {
   sessions: Sessions;
   stock_balances: StockBalances;
   stock_costs: StockCosts;
+  stock_count_lines: StockCountLines;
+  stock_counts: StockCounts;
   stock_documents: StockDocuments;
   stock_moves: StockMoves;
   stock_review_items: StockReviewItems;
