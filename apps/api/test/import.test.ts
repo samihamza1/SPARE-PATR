@@ -72,8 +72,33 @@ describe('reading files', () => {
 
   it('keeps non-numeric text from numeric cleaning', () => {
     expect(cleanNumericText('1E-3')).toBe('0.001');
-    expect(cleanNumericText('99999999999999999999')).toBe('100000000000000000000');
+    expect(cleanNumericText('1.2345678901234567E+15')).toBe('1234567890123460');
     expect(cleanNumericText('abc')).toBe('abc');
+  });
+
+  it('keeps integers exactly: long numeric part numbers are not float artefacts', () => {
+    expect(cleanNumericText('1234567890123456')).toBe('1234567890123456');
+    expect(cleanNumericText('12345678901234567')).toBe('12345678901234567');
+    expect(cleanNumericText('99999999999999999999')).toBe('99999999999999999999');
+    expect(cleanNumericText(' 42 ')).toBe('42');
+    // Only values with a fraction or an exponent are cut to 15 significant digits.
+    expect(cleanNumericText('17.850000000000001')).toBe('17.85');
+  });
+
+  it('never expands huge exponents (left as read, so the value is refused later)', () => {
+    const started = Date.now();
+    for (const text of ['1E+100000000', '1E-10000000', '1e31', '9.9E+200000']) {
+      expect(cleanNumericText(text)).toBe(text);
+    }
+    // 30 is the largest exponent expanded; beyond 40 characters the text is kept too.
+    expect(cleanNumericText('1E+30')).toBe(`1${'0'.repeat(30)}`);
+    expect(cleanNumericText('1.23456789012345E-30')).toBe('1.23456789012345E-30');
+    expect(Date.now() - started).toBeLessThan(200);
+    const price = parseRow(
+      { partNumber: 'A-1', nameEn: 'Pad', sellPrice: cleanNumericText('1E+100000000') },
+      PRICE,
+    );
+    expect(price.issues).toEqual(['bad_price']);
   });
 });
 
@@ -142,6 +167,31 @@ describe('parsing a row', () => {
     expect(row(['1', 'N70', 'Battery', null, null, '١٢٫٥', null, null]).parsed.sellPrice).toBe(
       '12.50',
     );
+  });
+
+  it('flags a price that rounds to zero as zero_price', () => {
+    const tiny = parseRow({ partNumber: 'C-1', nameEn: 'Clip', sellPrice: '0.004' }, PRICE);
+    expect([tiny.parsed.sellPrice, tiny.issues]).toEqual(['0.00', ['zero_price', 'price_rounded']]);
+    const down = parseRow(
+      { partNumber: 'C-1', nameEn: 'Clip', sellPrice: '0.9' },
+      { minorUnits: 0, roundingMode: 'DOWN' },
+    );
+    expect([down.parsed.sellPrice, down.issues]).toEqual(['0', ['zero_price', 'price_rounded']]);
+    expect(
+      parseRow({ partNumber: 'C-1', nameEn: 'Clip', sellPrice: '0.006' }, PRICE).issues,
+    ).toEqual(['price_rounded']);
+  });
+
+  it('refuses numbers longer than any real price, cost or quantity', () => {
+    const long = '9'.repeat(41);
+    const r = parseRow(
+      { partNumber: 'A-1', nameEn: 'Pad', sellPrice: long, cost: long, quantity: long },
+      PRICE,
+    );
+    expect(r.issues).toEqual(['bad_price', 'bad_cost', 'bad_quantity']);
+    expect(
+      parseRow({ partNumber: 'A-1', nameEn: 'Pad', sellPrice: '9'.repeat(40) }, PRICE).issues,
+    ).toEqual([]);
   });
 
   it('stores only the mapped columns', () => {
