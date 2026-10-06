@@ -326,6 +326,8 @@ describe('opening stock from an applied import', () => {
     );
     const after = (await owner.get(`/stock/opening/${draft.id}`)).json<OpeningDraft>();
     expect(after.status).toBe('posted');
+    const list = (await owner.get('/stock/opening')).json<{ id: string; status: string }[]>();
+    expect(list).toEqual([expect.objectContaining({ id: draft.id, status: 'posted' })]);
   });
 
   it('allows one opening move per part and location', async () => {
