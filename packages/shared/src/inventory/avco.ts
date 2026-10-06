@@ -12,8 +12,9 @@ export interface CostState {
   /** Stock value at the functional currency's minor units; same sign as quantity, 0 at 0. */
   readonly value: string;
   /**
-   * The last position with positive quantity: refValue / refQuantity is the unit cost
-   * used for units issued beyond what is on hand. Null until the part first had stock.
+   * The latest known unit cost, as a ratio refValue / refQuantity: the last position with
+   * positive quantity, or the last receipt if it left the quantity at or below zero. It
+   * prices units issued beyond what is on hand. Null until the part first had stock.
    */
   readonly refQuantity: number | null;
   readonly refValue: string | null;
@@ -46,7 +47,8 @@ export interface ReceiptResult {
   /**
    * Change to stock value, beyond the receipt itself, for units that were issued while
    * stock was negative: their cost is trued up to the receipt's unit cost. Posted as a
-   * zero-quantity cost adjustment move; negative means value leaves stock (more cost).
+   * zero-quantity cost adjustment move BEFORE the receipt move, so every intermediate
+   * state stays consistent; negative means value leaves stock (more cost).
    */
   readonly adjustment: string;
 }
@@ -75,11 +77,28 @@ function format(value: Decimal, spec: CurrencySpec): string {
   return formatFixed(value, spec.minorUnits);
 }
 
-function nextState(quantity: number, value: Decimal, before: CostState, spec: CurrencySpec) {
+/**
+ * The state after a move. The database trigger applies the same rule (ADR 0020): a positive
+ * position becomes the reference; otherwise a receipt's own unit cost does.
+ */
+function nextState(
+  quantity: number,
+  value: Decimal,
+  before: CostState,
+  spec: CurrencySpec,
+  receipt?: { quantity: number; value: Decimal },
+): CostState {
   const v = format(value, spec);
-  return quantity > 0
-    ? { quantity, value: v, refQuantity: quantity, refValue: v }
-    : { quantity, value: v, refQuantity: before.refQuantity, refValue: before.refValue };
+  if (quantity > 0) return { quantity, value: v, refQuantity: quantity, refValue: v };
+  if (receipt !== undefined) {
+    return {
+      quantity,
+      value: v,
+      refQuantity: receipt.quantity,
+      refValue: format(receipt.value, spec),
+    };
+  }
+  return { quantity, value: v, refQuantity: before.refQuantity, refValue: before.refValue };
 }
 
 /** The unit cost used for the next issue, or null when the part never had stock. */
@@ -170,7 +189,10 @@ export function receiveCost(
     adjustment = booked.neg().minus(actual);
   }
   return {
-    state: nextState(q + quantity, v.plus(incoming).plus(adjustment), before, ctx.spec),
+    state: nextState(q + quantity, v.plus(incoming).plus(adjustment), before, ctx.spec, {
+      quantity,
+      value: incoming,
+    }),
     adjustment: format(adjustment, ctx.spec),
   };
 }
