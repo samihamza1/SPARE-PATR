@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { roundingModeSchema } from './money';
 
+/** Business rules each module reads on its own (ADR 0022), so one module's gap never blocks another. */
+export const moneySettingsSchema = z.object({
+  roundingMode: roundingModeSchema,
+});
+export const inventorySettingsSchema = z.object({
+  allowNegativeStock: z.boolean(),
+});
+
 /**
  * Per-tenant settings stored in `tenants.settings` (ADR 0010).
  *
@@ -31,12 +39,8 @@ export const tenantSettingsSchema = z.object({
         .default(15),
     })
     .prefault({}),
-  money: z.object({
-    roundingMode: roundingModeSchema,
-  }),
-  inventory: z.object({
-    allowNegativeStock: z.boolean(),
-  }),
+  money: moneySettingsSchema,
+  inventory: inventorySettingsSchema,
 });
 
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;

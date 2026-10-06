@@ -101,6 +101,34 @@ function nextState(
   return { quantity, value: v, refQuantity: before.refQuantity, refValue: before.refValue };
 }
 
+/**
+ * Applies one stock move (quantity and functional value, both signed) exactly as the
+ * database trigger does (stock_moves_apply). The API uses it to compute the state each
+ * move must carry as its snapshot; issueCost and receiveCost decide the values.
+ */
+export function applyMove(
+  before: CostState,
+  quantity: number,
+  functionalAmount: string,
+  ctx: AvcoContext,
+): CostState {
+  if (!Number.isSafeInteger(quantity)) throw new RangeError('Quantity must be an integer');
+  const v = checkState(before, ctx.spec);
+  const delta = dec(functionalAmount);
+  if (delta.decimalPlaces() > ctx.spec.minorUnits) {
+    throw new RangeError('Value is not at currency scale');
+  }
+  const after = nextState(
+    before.quantity + quantity,
+    v.plus(delta),
+    before,
+    ctx.spec,
+    quantity > 0 ? { quantity, value: delta } : undefined,
+  );
+  checkState(after, ctx.spec);
+  return after;
+}
+
 /** The unit cost used for the next issue, or null when the part never had stock. */
 export function unitCost(s: CostState): Decimal | null {
   if (s.quantity > 0) return dec(s.value).div(units(s.quantity));

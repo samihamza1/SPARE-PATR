@@ -91,6 +91,7 @@ export default async function globalSetup(): Promise<void> {
       defaultLocale: 'ar',
       functionalCurrency: { code: 'AAA', minorUnits: 2 },
       settings: { money: { roundingMode: 'HALF_EVEN' }, inventory: { allowNegativeStock: false } },
+      locationName: 'المحل',
       owner: { username: shop.username, displayName: 'مالك المتجر', password: shop.password },
     });
     const type = await platformVehicle(db, 'type', 'Car', null);

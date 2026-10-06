@@ -80,6 +80,7 @@ export async function provisionShop(env: TestEnv): Promise<Shop> {
       defaultLocale: 'ar',
       functionalCurrency: { code: 'AAA', minorUnits: 2 },
       settings: { money: { roundingMode: 'HALF_EVEN' }, inventory: { allowNegativeStock: false } },
+      locationName: 'Main shop',
       owner: { username: 'owner', displayName: 'Owner', password: OWNER_PASSWORD },
     },
     env.clock.now,

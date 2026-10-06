@@ -1,5 +1,10 @@
 import { withTenant } from '@autoparts/db';
-import { createDeviceSchema, enrollDeviceSchema, idParamsSchema } from '@autoparts/shared';
+import {
+  createDeviceSchema,
+  enrollDeviceSchema,
+  idParamsSchema,
+  setDeviceLocationSchema,
+} from '@autoparts/shared';
 import type { Device } from '@autoparts/shared';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
@@ -19,12 +24,21 @@ const ENROLL_RATE_LIMIT = { max: 10, timeWindow: '1 minute' } as const;
 async function loadDevices(trx: Trx, id?: string): Promise<Device[]> {
   let q = trx
     .selectFrom('devices')
-    .select(['id', 'name', 'enrolled_at', 'enrollment_expires_at', 'last_seen_at', 'revoked_at'])
+    .select([
+      'id',
+      'name',
+      'location_id',
+      'enrolled_at',
+      'enrollment_expires_at',
+      'last_seen_at',
+      'revoked_at',
+    ])
     .orderBy('name');
   if (id !== undefined) q = q.where('id', '=', id);
   return (await q.execute()).map((d) => ({
     id: d.id,
     name: d.name,
+    locationId: d.location_id,
     enrolledAt: iso(d.enrolled_at),
     enrollmentExpiresAt: d.enrolled_at === null ? iso(d.enrollment_expires_at) : null,
     lastSeenAt: iso(d.last_seen_at),
@@ -36,6 +50,25 @@ async function loadDevice(trx: Trx, id: string): Promise<Device> {
   const [device] = await loadDevices(trx, id);
   if (device === undefined) throw notFound();
   return device;
+}
+
+/**
+ * A selling device belongs to an active shop (ADR 0018). Without a choice, the default
+ * shop; a tenant without locations yet leaves it unset.
+ */
+async function deviceLocation(trx: Trx, requested: string | undefined): Promise<string | null> {
+  let q = trx
+    .selectFrom('locations')
+    .select(['id', 'kind', 'archived_at'])
+    .where('archived_at', 'is', null);
+  q = requested === undefined ? q.where('is_default', '=', true) : q.where('id', '=', requested);
+  const location = await q.executeTakeFirst();
+  if (location === undefined) {
+    if (requested === undefined) return null;
+    throw notFound();
+  }
+  if (location.kind !== 'shop') throw new ApiError(409, 'location.not_a_shop');
+  return location.id;
 }
 
 /** Shown as XXXXX-XXXXX; normalizeEnrollmentCode() undoes the grouping. */
@@ -66,6 +99,7 @@ export function deviceRoutes(
             id: request.body.id,
             tenant_id: auth.tenantId,
             name: request.body.name,
+            location_id: await deviceLocation(trx, request.body.locationId),
             created_by: auth.userId,
             created_at: now,
             enrollment_code_hash: sha256(code),
@@ -83,6 +117,32 @@ export function deviceRoutes(
       });
       return reply.code(201).send({ device, enrollmentCode: display(code) });
     },
+  );
+
+  r.patch(
+    '/devices/:id',
+    { schema: { params: idParamsSchema, body: setDeviceLocationSchema }, config: { access } },
+    (request) =>
+      inTenant(deps, request, async (trx) => {
+        const { id } = request.params;
+        const before = await loadDevice(trx, id);
+        if (before.revokedAt !== null) throw conflict();
+        const locationId = await deviceLocation(trx, request.body.locationId);
+        if (locationId === before.locationId) return before;
+        await trx
+          .updateTable('devices')
+          .set({ location_id: locationId })
+          .where('id', '=', id)
+          .execute();
+        const after = await loadDevice(trx, id);
+        await audit(
+          trx,
+          actorOf(request),
+          { action: 'device.location', entityType: 'device', entityId: id, before, after },
+          deps.now(),
+        );
+        return after;
+      }),
   );
 
   r.post(
