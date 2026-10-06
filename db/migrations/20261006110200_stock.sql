@@ -1,6 +1,6 @@
 -- migrate:up
 
--- Stock ledger (ADR 0019, costing in ADR 0020).
+-- Stock ledger (ADR 0020, costing in ADR 0021).
 --
 -- stock_moves is the only record of stock and is append-only (invariant 3). Two tables are
 -- derived from it inside the database and nothing else writes them:
@@ -38,7 +38,7 @@ CREATE INDEX stock_documents_tenant_posted_idx ON stock_documents (tenant_id, po
 CREATE TABLE stock_moves (
   id                     uuid PRIMARY KEY CONSTRAINT stock_moves_id_v7 CHECK (is_uuid_v7(id)),
   tenant_id              uuid NOT NULL REFERENCES tenants (id),
-  -- The order in which the server applied the moves; AVCO follows it (ADR 0020).
+  -- The order in which the server applied the moves; AVCO follows it (ADR 0021).
   seq                    bigint GENERATED ALWAYS AS IDENTITY,
   document_id            uuid NOT NULL,
   line_no                integer NOT NULL CHECK (line_no >= 0),
@@ -50,7 +50,7 @@ CREATE TABLE stock_moves (
   -- Whole units (product owner, 2026-10-06); negative takes stock out.
   quantity               integer NOT NULL,
   -- Invariant 2: the value as entered, its currency, the rate used exactly as quoted
-  -- (1 fx_base = fx_rate fx_quote, ADR 0018) and the value in the functional currency.
+  -- (1 fx_base = fx_rate fx_quote, ADR 0019) and the value in the functional currency.
   amount                 numeric NOT NULL,
   currency               text NOT NULL,
   fx_rate                numeric NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE stock_costs (
   part_id      uuid NOT NULL,
   quantity     integer NOT NULL DEFAULT 0,
   value        numeric NOT NULL DEFAULT 0,
-  -- The latest known unit cost as a ratio (ADR 0020); it prices units issued beyond stock.
+  -- The latest known unit cost as a ratio (ADR 0021); it prices units issued beyond stock.
   ref_quantity integer,
   ref_value    numeric,
   last_move_id uuid,
@@ -281,7 +281,7 @@ BEGIN
   UPDATE stock_costs
      SET quantity     = v_quantity,
          value        = v_value,
-         -- The latest known unit cost (ADR 0020): a positive position, else a receipt's own.
+         -- The latest known unit cost (ADR 0021): a positive position, else a receipt's own.
          ref_quantity = CASE WHEN v_quantity > 0 THEN v_quantity
                              WHEN NEW.quantity > 0 THEN NEW.quantity
                              ELSE ref_quantity END,

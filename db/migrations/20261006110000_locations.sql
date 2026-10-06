@@ -16,7 +16,7 @@ CREATE FUNCTION new_uuid_v7() RETURNS uuid
       'hex')::uuid
   $$;
 
--- Where stock is kept (ADR 0017): shops sell, warehouses (storerooms, depots) only hold
+-- Where stock is kept (ADR 0018): shops sell, warehouses (storerooms, depots) only hold
 -- stock. Each tenant has exactly one default location, an active shop.
 CREATE TABLE locations (
   id          uuid PRIMARY KEY CONSTRAINT locations_id_v7 CHECK (is_uuid_v7(id)),

@@ -4,7 +4,7 @@ import { assertQuantity } from './quantity';
 
 /**
  * Average cost (AVCO) of one part across all locations, in the functional currency
- * (ADR 0020). The average itself is never stored or rounded: it is value / quantity.
+ * (ADR 0021). The average itself is never stored or rounded: it is value / quantity.
  */
 export interface CostState {
   /** On hand across all locations. Negative after accepted offline sales beyond stock. */
@@ -78,7 +78,7 @@ function format(value: Decimal, spec: CurrencySpec): string {
 }
 
 /**
- * The state after a move. The database trigger applies the same rule (ADR 0020): a positive
+ * The state after a move. The database trigger applies the same rule (ADR 0021): a positive
  * position becomes the reference; otherwise a receipt's own unit cost does.
  */
 function nextState(
