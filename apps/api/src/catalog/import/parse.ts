@@ -36,6 +36,8 @@ export interface PriceSpec {
 
 const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 const DECIMAL_TEXT = /^\d+(\.\d+)?$/;
+/** Longer than any real price, cost or quantity (and than the database would accept). */
+const MAX_DECIMAL_TEXT = 40;
 
 /** Text to a non-negative decimal, or null if it is not one. No guessing of separators. */
 export function parseQuantityText(text: string): Decimal | null {
@@ -43,7 +45,7 @@ export function parseQuantityText(text: string): Decimal | null {
     .trim()
     .replace(ARABIC_DIGITS, (d) => String(d.charCodeAt(0) - (d >= '\u06f0' ? 0x06f0 : 0x0660)))
     .replace('٫', '.');
-  if (!DECIMAL_TEXT.test(ascii)) return null;
+  if (ascii.length > MAX_DECIMAL_TEXT || !DECIMAL_TEXT.test(ascii)) return null;
   return new Decimal(ascii);
 }
 
@@ -110,9 +112,10 @@ export function parseRow(raw: RawImportRow, price: PriceSpec | null): ParsedRow 
     if (priceText === undefined) issues.push('no_price');
     else if (value === null) issues.push('bad_price');
     else if (price !== null) {
-      // A zero price is imported as given and flagged for review (product owner, 2026-10-05).
-      if (value.isZero()) issues.push('zero_price');
       const rounded = round(value, price.minorUnits, price.roundingMode);
+      // A zero price is imported as given and flagged for review (product owner, 2026-10-05);
+      // judged on the stored, rounded price, so 0.004 -> 0.00 is flagged too.
+      if (rounded.isZero()) issues.push('zero_price');
       parsed.sellPriceRaw = toDecimalString(value);
       parsed.sellPrice = formatFixed(rounded, price.minorUnits);
       if (!rounded.eq(value)) issues.push('price_rounded');
