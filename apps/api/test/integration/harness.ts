@@ -145,13 +145,15 @@ export const errorCode = (res: LightMyRequestResponse): unknown =>
 
 /**
  * Opens an owner transaction in the tenant, runs `lock` in it (e.g. SELECT ... FOR UPDATE)
- * and keeps it open until `release()`, so a test can line up concurrent requests behind it.
+ * and keeps it open while `fn` lines up concurrent requests behind it. `fn` gets
+ * `release()` to commit early; the transaction always ends when `fn` settles.
  */
-export async function holdLock(
+export async function whileLocked<T>(
   env: TestEnv,
   tenantId: string,
   lock: (trx: Transaction<DB>) => Promise<unknown>,
-): Promise<{ release: () => Promise<void> }> {
+  fn: (release: () => Promise<void>) => Promise<T>,
+): Promise<T> {
   let release!: () => void;
   const released = new Promise<void>((resolve) => (release = resolve));
   let locked!: () => void;
@@ -161,13 +163,16 @@ export async function holdLock(
     locked();
     await released;
   });
-  await Promise.race([isLocked, done]);
-  return {
-    release: async () => {
-      release();
-      await done;
-    },
+  const releaseAndWait = async () => {
+    release();
+    await done;
   };
+  await Promise.race([isLocked, done]);
+  try {
+    return await fn(releaseAndWait);
+  } finally {
+    await releaseAndWait();
+  }
 }
 
 /** Resolves once `count` backends of this database are waiting for a lock. */

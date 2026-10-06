@@ -11,7 +11,7 @@ import {
   ORIGIN,
   OWNER_PASSWORD,
   errorCode,
-  holdLock,
+  whileLocked,
   loggedIn,
   provisionShop,
   setupEnv,
@@ -158,16 +158,22 @@ describe('lockout', () => {
     const s = await provisionShop(env);
     await failWrong(s, 4);
     // Hold the user row so both attempts are past the password check and wait to record.
-    const held = await holdLock(env, s.tenantId, (trx) =>
-      trx.selectFrom('users').select('id').where('id', '=', s.ownerUserId).forUpdate().execute(),
+    const [fifthFailure, correct] = await whileLocked(
+      env,
+      s.tenantId,
+      (trx) =>
+        trx.selectFrom('users').select('id').where('id', '=', s.ownerUserId).forUpdate().execute(),
+      async (release) => {
+        const a = attempt(s, 'wrong 4 password');
+        await waitForLockWaiters(env, 1);
+        const b = attempt(s, OWNER_PASSWORD);
+        await waitForLockWaiters(env, 2);
+        await release();
+        return Promise.all([a, b]);
+      },
     );
-    const fifthFailure = attempt(s, 'wrong 4 password');
-    await waitForLockWaiters(env, 1);
-    const correct = attempt(s, OWNER_PASSWORD);
-    await waitForLockWaiters(env, 2);
-    await held.release();
-    expect((await fifthFailure).statusCode).toBe(401);
-    expect((await correct).statusCode).toBe(401);
+    expect(fifthFailure.statusCode).toBe(401);
+    expect(correct.statusCode).toBe(401);
     expect((await lockState(s)).failed_login_count).toBe(6);
   });
 });
