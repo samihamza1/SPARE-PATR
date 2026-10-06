@@ -59,12 +59,16 @@ describe('negative stock (accepted offline sales, ADR 0019)', () => {
 
   it('a receipt that only partly covers the shortfall keeps the rest at the old average', () => {
     const r = receiveCost(state(-5, '-50.00', [1, '10.00']), 2, '24.00', ctx);
-    expect(r).toEqual({ state: state(-3, '-30.00', [1, '10.00']), adjustment: '-4.00' });
+    // The receipt's unit cost (12) becomes the latest known cost for later sales.
+    expect(r).toEqual({ state: state(-3, '-30.00', [2, '24.00']), adjustment: '-4.00' });
   });
 
   it('units sold with no known cost take their cost from the receipt', () => {
     const r = receiveCost(state(-2, '0.00'), 4, '40.00', ctx);
     expect(r).toEqual({ state: state(2, '20.00', [2, '20.00']), adjustment: '-20.00' });
+    // Back to exactly zero: the cost is known from now on.
+    const zero = receiveCost(state(-1, '0.00'), 1, '4.00', ctx);
+    expect(zero).toEqual({ state: state(0, '0.00', [1, '4.00']), adjustment: '-4.00' });
   });
 });
 
