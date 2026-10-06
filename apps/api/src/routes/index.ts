@@ -8,6 +8,9 @@ import { priceRoutes } from './catalog/prices';
 import { searchRoutes } from './catalog/search';
 import { taxonomyRoutes } from './catalog/taxonomy';
 import { deviceRoutes } from './devices';
+import { fxRateRoutes } from './inventory/fx-rates';
+import { locationRoutes } from './inventory/locations';
+import { stockRoutes } from './inventory/stock';
 import { roleRoutes } from './roles';
 import { sessionRoutes } from './sessions';
 import { settingsRoutes } from './settings';
@@ -42,4 +45,7 @@ export function registerPlatformRoutes(app: FastifyInstance, deps: PlatformDeps)
   priceRoutes(app, deps);
   searchRoutes(app, deps);
   importRoutes(app, deps);
+  locationRoutes(app, deps);
+  fxRateRoutes(app, deps);
+  stockRoutes(app, deps);
 }
