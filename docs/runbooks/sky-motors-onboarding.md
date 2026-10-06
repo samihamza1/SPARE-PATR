@@ -75,3 +75,28 @@ A dry run with placeholder settings on a local database only gave the following:
 
 These counts will differ slightly with the final settings, because zero prices are now
 imported.
+
+## Opening stock (Sprint 4)
+
+Decisions (product owner, 2026-10-06): one average cost per part across all locations;
+repeated rows are combined by summing their quantities; rows with a quantity but no cost
+(or a cost of zero) need a cost entered before posting; costs in AED convert at the rate of
+the go-live day; quantities come from the file and a physical count corrects them.
+
+1. In Settings → Locations, check the default shop's name and add the storeroom (and any
+   warehouse) as a warehouse.
+2. In Exchange rates, enter the go-live day's rate as the market quotes it, e.g.
+   `1 USD = <rate> AED`.
+3. In Opening stock, choose the applied import of the stock sheet. Check the location
+   (the shop) and the date, then:
+   1. enter a unit cost for every line that needs one (the screen suggests the average of
+      the part's other rows when there is one);
+   2. fix or exclude lines whose quantity is not whole units;
+   3. compare the totals (units, AED and USD) with the sheet, then post.
+4. Count the storeroom and the shop (Stock counts) and approve the differences.
+
+What to expect (local dry run with a trial rate of 3.6725, 2026-10-06): 2,237 parts, of
+which 1,229 have stock and a cost, 1 needs a cost and 1,007 have a quantity of zero
+(excluded); 21,641 units worth AED 1,802,742.21, i.e. USD 490,876.02 at the trial rate.
+Posting created 1,230 moves in about 0.5 s, and the posted USD total equalled the draft's
+to the cent.
