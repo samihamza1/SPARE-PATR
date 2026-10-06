@@ -5,6 +5,7 @@
  *   pnpm tenant:create --slug sky-motors --name "Sky Motors" --timezone <IANA zone> \
  *     --locale ar --currency <ISO code> --minor-units <0-4> [--cash-increment <decimal>] \
  *     --rounding <HALF_UP|HALF_EVEN|...> --negative-stock <allow|deny> \
+ *     --location-name "<default shop name>" \
  *     --owner-username <name> --owner-name "<display name>"
  *
  * The owner password is read from a hidden prompt, or from TENANT_OWNER_PASSWORD when
@@ -46,6 +47,7 @@ const { values } = parseArgs({
     'negative-stock': { type: 'string' },
     'owner-username': { type: 'string' },
     'owner-name': { type: 'string' },
+    'location-name': { type: 'string' },
   },
   strict: true,
 });
@@ -86,6 +88,7 @@ try {
       money: { roundingMode: required('rounding') as never },
       inventory: { allowNegativeStock: negativeStock === 'allow' },
     },
+    locationName: required('location-name'),
     owner: {
       username: required('owner-username'),
       displayName: required('owner-name'),
