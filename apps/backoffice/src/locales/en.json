@@ -207,7 +207,17 @@
     "audit": { "read": "View audit log" },
     "cost": { "view": "See cost and margin" },
     "catalog": { "manage": "Manage the catalog", "import": "Import catalog files" },
-    "prices": { "manage": "Manage prices" }
+    "prices": { "manage": "Manage prices" },
+    "locations": { "manage": "Manage locations and warehouses" },
+    "fx": { "manage": "Enter exchange rates" },
+    "stock": {
+      "adjust": "Adjust stock",
+      "transfer": "Transfer stock between locations",
+      "count": "Take part in stock counts",
+      "approve_count": "Approve stock counts",
+      "review": "Review stock alerts",
+      "opening": "Enter opening stock"
+    }
   },
   "roles": {
     "title": "Roles and permissions",
