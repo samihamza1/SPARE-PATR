@@ -21,6 +21,7 @@ import type {
   OpeningDraft,
   OpeningLine,
   OpeningLineStatus,
+  OpeningSummary,
   RoundingMode,
 } from '@autoparts/shared';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
@@ -384,6 +385,29 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
       );
       return reply.code(201).send(draft);
     },
+  );
+
+  r.get('/stock/opening', { config: { access } }, (request) =>
+    inTenant(deps, request, async (trx, auth): Promise<OpeningSummary[]> => {
+      requireCostView(auth);
+      const rows = await trx
+        .selectFrom('opening_stock_drafts as d')
+        .innerJoin('import_batches as b', (j) =>
+          j.onRef('b.tenant_id', '=', 'd.tenant_id').onRef('b.id', '=', 'd.batch_id'),
+        )
+        .select(['d.id', 'd.batch_id', 'b.file_name', 'd.status', 'd.created_at', 'd.posted_at'])
+        .orderBy('d.created_at', 'desc')
+        .limit(100)
+        .execute();
+      return rows.map((d) => ({
+        id: d.id,
+        batchId: d.batch_id,
+        fileName: d.file_name,
+        status: d.status as OpeningSummary['status'],
+        createdAt: d.created_at.toISOString(),
+        postedAt: d.posted_at === null ? null : d.posted_at.toISOString(),
+      }));
+    }),
   );
 
   r.get(
