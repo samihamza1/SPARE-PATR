@@ -20,6 +20,7 @@ import { api } from '../api';
 import { ME_KEY, useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { useFormatDateTime } from '../format';
+import { Form, useRequired } from '../forms';
 import { roleLabel } from './RolesPage';
 
 const USERS_KEY = ['users'] as const;
@@ -28,20 +29,21 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ username: '', displayName: '', password: '' });
+  const required = useRequired(form);
   const create = useMutation({
     mutationFn: () => api<User>('POST', '/users', { id: newId(), ...form }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: USERS_KEY });
       setForm({ username: '', displayName: '', password: '' });
+      required.reset();
       onClose();
     },
   });
   return (
     <Modal opened={opened} onClose={onClose} title={t('users.create')}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          create.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) create.mutate();
         }}
       >
         <Stack>
@@ -50,6 +52,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
             label={t('fields.username')}
             required
             value={form.username}
+            error={required.errors.username}
             onChange={(e) => {
               setForm({ ...form, username: e.currentTarget.value });
             }}
@@ -58,6 +61,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
             label={t('fields.displayName')}
             required
             value={form.displayName}
+            error={required.errors.displayName}
             onChange={(e) => {
               setForm({ ...form, displayName: e.currentTarget.value });
             }}
@@ -68,6 +72,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
             required
             autoComplete="new-password"
             value={form.password}
+            error={required.errors.password}
             onChange={(e) => {
               setForm({ ...form, password: e.currentTarget.value });
             }}
@@ -76,7 +81,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
             {t('common.save')}
           </Button>
         </Stack>
-      </form>
+      </Form>
     </Modal>
   );
 }
@@ -130,16 +135,16 @@ function RolesModal({ user, roles, onClose }: { user: User; roles: Role[]; onClo
 function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void }) {
   const { t } = useTranslation();
   const [password, setPassword] = useState('');
+  const required = useRequired({ password });
   const reset = useMutation({
     mutationFn: () => api('POST', `/users/${user.id}/password`, { password }),
     onSuccess: onClose,
   });
   return (
     <Modal opened onClose={onClose} title={t('users.resetPasswordOf', { name: user.displayName })}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          reset.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) reset.mutate();
         }}
       >
         <Stack>
@@ -150,6 +155,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
             required
             autoComplete="new-password"
             value={password}
+            error={required.errors.password}
             onChange={(e) => {
               setPassword(e.currentTarget.value);
             }}
@@ -161,7 +167,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
             {t('users.resetPassword')}
           </Button>
         </Stack>
-      </form>
+      </Form>
     </Modal>
   );
 }

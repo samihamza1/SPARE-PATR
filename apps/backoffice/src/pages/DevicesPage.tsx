@@ -20,6 +20,7 @@ import { api } from '../api';
 import { useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { useFormatDateTime } from '../format';
+import { Form, useRequired } from '../forms';
 
 const DEVICES_KEY = ['devices'] as const;
 
@@ -69,12 +70,14 @@ export function DevicesPage() {
   });
   const [name, setName] = useState('');
   const [code, setCode] = useState<CodeResult | null>(null);
+  const required = useRequired({ name });
   const refresh = () => queryClient.invalidateQueries({ queryKey: DEVICES_KEY });
 
   const create = useMutation({
     mutationFn: () => api<CodeResult>('POST', '/devices', { id: newId(), name: name.trim() }),
     onSuccess: async (result) => {
       setName('');
+      required.reset();
       setCode(result);
       await refresh();
     },
@@ -101,26 +104,26 @@ export function DevicesPage() {
   return (
     <Stack>
       <Title order={2}>{t('devices.title')}</Title>
-      <Group
-        component="form"
-        align="flex-end"
-        onSubmit={(e) => {
-          e.preventDefault();
-          create.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) create.mutate();
         }}
       >
-        <TextInput
-          label={t('devices.name')}
-          required
-          value={name}
-          onChange={(e) => {
-            setName(e.currentTarget.value);
-          }}
-        />
-        <Button type="submit" loading={create.isPending}>
-          {t('devices.add')}
-        </Button>
-      </Group>
+        <Group align="flex-end">
+          <TextInput
+            label={t('devices.name')}
+            required
+            value={name}
+            error={required.errors.name}
+            onChange={(e) => {
+              setName(e.currentTarget.value);
+            }}
+          />
+          <Button type="submit" loading={create.isPending}>
+            {t('devices.add')}
+          </Button>
+        </Group>
+      </Form>
       <ErrorAlert error={devices.error ?? create.error ?? newCode.error ?? revoke.error} />
       <Table striped>
         <Table.Thead>

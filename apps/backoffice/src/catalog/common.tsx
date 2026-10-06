@@ -80,9 +80,11 @@ export const categoryName = (c: Category, lang: string): string =>
 /** Picks a vehicle (shared or this shop's) by searching its name, Arabic name or engine code. */
 export function VehiclePicker({
   label,
+  error,
   onPick,
 }: {
   label?: string;
+  error?: string | undefined;
   onPick: (vehicle: Vehicle) => void;
 }) {
   const { t } = useTranslation();
@@ -98,6 +100,7 @@ export function VehiclePicker({
     <Select
       label={label ?? t('catalog.chooseVehicle')}
       placeholder={t('catalog.chooseVehicle')}
+      error={error}
       searchable
       searchValue={search}
       onSearchChange={setSearch}

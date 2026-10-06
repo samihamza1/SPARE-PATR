@@ -14,6 +14,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router';
 import { SHOP_CODE_KEY, useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LanguageSwitch } from '../components/Shell';
+import { useRequired } from '../forms';
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -25,11 +26,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const required = useRequired({ tenant, username, password });
 
   const from = (location.state as { from?: string } | null)?.from ?? '/';
   if (me !== null) return <Navigate to={from} replace />;
 
   const submit = async () => {
+    if (!required.ok()) return;
     setBusy(true);
     setError(null);
     try {
@@ -51,6 +54,8 @@ export function LoginPage() {
         p="xl"
         w={380}
         component="form"
+        // Required fields are checked in code, with messages in the app's language.
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
@@ -66,6 +71,7 @@ export function LoginPage() {
             label={t('auth.shopCode')}
             description={t('auth.shopCodeHint')}
             value={tenant}
+            error={required.errors.tenant}
             onChange={(e) => {
               setTenant(e.currentTarget.value);
             }}
@@ -76,6 +82,7 @@ export function LoginPage() {
           <TextInput
             label={t('auth.username')}
             value={username}
+            error={required.errors.username}
             onChange={(e) => {
               setUsername(e.currentTarget.value);
             }}
@@ -85,6 +92,7 @@ export function LoginPage() {
           <PasswordInput
             label={t('auth.password')}
             value={password}
+            error={required.errors.password}
             onChange={(e) => {
               setPassword(e.currentTarget.value);
             }}

@@ -1,42 +1,14 @@
-import type {
-  ImportBatchDetail,
-  ImportRow,
-  PartSummary,
-  SearchResult,
-  Vehicle,
-} from '@autoparts/shared';
+import type { ImportBatchDetail, ImportRow, SearchResult, Vehicle } from '@autoparts/shared';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ar from '../src/locales/ar.json';
-import { ALL, FakeApi, me, renderApp } from './harness';
+import { ALL, FakeApi, id, me, part, pick, renderApp } from './harness';
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-
-const id = (n: number) => `01900000-0000-7000-8000-${String(n).padStart(12, '0')}`;
-const part = (n: number, sku: string, grade: PartSummary['qualityGrade'], nameAr: string) => ({
-  id: id(n),
-  sku,
-  nameAr,
-  nameEn: null,
-  qualityGrade: grade,
-  brandId: null,
-  categoryId: null,
-  unit: 'piece',
-  archivedAt: null,
-});
-
-/** Opens a Mantine Select by its label and picks an option, as a user would. */
-async function pick(label: string, option: string) {
-  const user = userEvent.setup();
-  // Required fields add " *" to the label.
-  const exact = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`);
-  await user.click(screen.getByLabelText(exact, { selector: 'input' }));
-  await user.click(await screen.findByRole('option', { name: option }));
-}
 
 describe('salesperson search', () => {
   it('shows each result with its alternatives in the order the API ranked them', async () => {

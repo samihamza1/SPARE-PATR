@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { ME_KEY, useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
+import { Form, useRequired } from '../forms';
 
 const ROLES_KEY = ['roles'] as const;
 
@@ -31,6 +32,7 @@ function CreateRoleModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
+  const required = useRequired({ code, name });
   const create = useMutation({
     mutationFn: () => api<Role>('POST', '/roles', { id: newId(), code, name, permissions: [] }),
     onSuccess: async () => {
@@ -40,10 +42,9 @@ function CreateRoleModal({ onClose }: { onClose: () => void }) {
   });
   return (
     <Modal opened onClose={onClose} title={t('roles.create')}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          create.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) create.mutate();
         }}
       >
         <Stack>
@@ -54,6 +55,7 @@ function CreateRoleModal({ onClose }: { onClose: () => void }) {
             required
             dir="ltr"
             value={code}
+            error={required.errors.code}
             onChange={(e) => {
               setCode(e.currentTarget.value);
             }}
@@ -62,6 +64,7 @@ function CreateRoleModal({ onClose }: { onClose: () => void }) {
             label={t('fields.name')}
             required
             value={name}
+            error={required.errors.name}
             onChange={(e) => {
               setName(e.currentTarget.value);
             }}
@@ -70,7 +73,7 @@ function CreateRoleModal({ onClose }: { onClose: () => void }) {
             {t('common.save')}
           </Button>
         </Stack>
-      </form>
+      </Form>
     </Modal>
   );
 }

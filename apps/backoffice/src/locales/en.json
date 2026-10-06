@@ -53,7 +53,69 @@
     "locale": "Language",
     "minorUnits": "Decimal places",
     "cashIncrement": "Smallest cash denomination",
-    "settings": "Settings"
+    "settings": "Settings",
+    "tenant": "Shop code",
+    "currentPassword": "Current password",
+    "id": "Record identifier",
+    "roleId": "Role",
+    "permissions": "Permissions",
+    "defaultLocale": "Default language",
+    "session": "Sessions",
+    "idleMinutes": "Idle timeout (minutes)",
+    "absoluteHours": "Maximum session length (hours)",
+    "security": "Security",
+    "maxFailedLogins": "Failed sign-ins before lock",
+    "lockoutMinutes": "Lock duration (minutes)",
+    "money": "Money",
+    "roundingMode": "Rounding",
+    "inventory": "Inventory",
+    "allowNegativeStock": "Negative stock",
+    "sortOrder": "Order",
+    "isActive": "Active",
+    "kind": "Kind",
+    "archived": "Archived",
+    "parentId": "Parent",
+    "nameAr": "Arabic name",
+    "nameEn": "English name",
+    "level": "Level",
+    "yearFrom": "From year",
+    "yearTo": "To year",
+    "engineCode": "Engine code",
+    "displacementCc": "Displacement (cc)",
+    "fuel": "Fuel",
+    "alias": "Word",
+    "target": "Means",
+    "vehicleId": "Vehicle",
+    "categoryId": "Category",
+    "number": "Part number",
+    "brandId": "Brand",
+    "sku": "SKU",
+    "qualityGrade": "Quality",
+    "unit": "Unit",
+    "notes": "Notes",
+    "numbers": "Part numbers",
+    "ids": "Selected parts",
+    "set": "Changes",
+    "note": "Note",
+    "newPartId": "Replacement part",
+    "effectiveAt": "Effective from",
+    "reason": "Reason",
+    "partId": "Part",
+    "currency": "Currency",
+    "isDefault": "Default",
+    "price": "Price",
+    "priceListId": "Price list",
+    "fileName": "File name",
+    "contentBase64": "File",
+    "sheet": "Sheet",
+    "headerRow": "Header row",
+    "mapping": "Column mapping",
+    "columns": "Columns",
+    "numberKind": "Kind of part numbers",
+    "costCurrency": "Cost currency",
+    "skuPrefix": "SKU prefix",
+    "rowIds": "Rows",
+    "skipped": "Skipped"
   },
   "validation": {
     "invalid": "Invalid value",
@@ -61,6 +123,33 @@
       "too_short": "Too short: at least 10 characters",
       "too_long": "Too long",
       "too_common": "Too common, choose another one"
+    },
+    "required": "Required",
+    "withField": "{{field}}: {{message}}",
+    "id": {
+      "not_uuid_v7": "Invalid record identifier; reload the page and try again"
+    },
+    "name": {
+      "required": "Enter an Arabic or an English name"
+    },
+    "sku": {
+      "invalid": "Use English letters, digits and . _ / - only, starting with a letter or a digit (up to 40)"
+    },
+    "price": {
+      "negative": "The price cannot be negative"
+    },
+    "alias": {
+      "target_mismatch": "Choose the vehicle or the category this word means"
+    },
+    "bulk": {
+      "nothing_to_set": "Choose what to change"
+    },
+    "import": {
+      "mapping_needs_identity": "Map a part number, English name or Arabic name column",
+      "mapping_needs_price_list": "Choose the price list for the selling price",
+      "mapping_needs_cost_currency": "Choose the currency of the cost column",
+      "mapping_needs_sku": "Map a SKU column or enter a SKU prefix",
+      "mapping_duplicate_column": "One column is mapped to more than one field"
     }
   },
   "errors": {
