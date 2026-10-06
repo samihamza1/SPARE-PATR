@@ -7,7 +7,7 @@ import type { Shop } from './harness';
 import {
   Client,
   OWNER_PASSWORD,
-  holdLock,
+  whileLocked,
   loggedIn,
   provisionShop,
   setupEnv,
@@ -187,15 +187,20 @@ describe('last administrator', () => {
    * blocks their audit inserts (after the check) until both have arrived.
    */
   async function race(s: Shop, first: () => Promise<{ statusCode: number }>, second: typeof first) {
-    const held = await holdLock(env, s.tenantId, (trx) =>
-      sql`LOCK TABLE audit_log IN SHARE MODE`.execute(trx),
+    const [a, b] = await whileLocked(
+      env,
+      s.tenantId,
+      (trx) => sql`LOCK TABLE audit_log IN SHARE MODE`.execute(trx),
+      async (release) => {
+        const x = first();
+        await waitForLockWaiters(env, 1);
+        const y = second();
+        await waitForLockWaiters(env, 2);
+        await release();
+        return Promise.all([x, y]);
+      },
     );
-    const a = first();
-    await waitForLockWaiters(env, 1);
-    const b = second();
-    await waitForLockWaiters(env, 2);
-    await held.release();
-    return [(await a).statusCode, (await b).statusCode];
+    return [a.statusCode, b.statusCode];
   }
 
   async function twoOwners() {
