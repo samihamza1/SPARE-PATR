@@ -38,3 +38,4 @@ Template:
 | [0014](0014-catalog-model.md)               | Catalog model                                               |
 | [0015](0015-catalog-search.md)              | Catalog search                                              |
 | [0016](0016-catalog-import.md)              | Catalog import from spreadsheets                            |
+| [0017](0017-account-protection.md)          | Account protection: lockout, escalation, proxy              |
