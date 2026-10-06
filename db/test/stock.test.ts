@@ -12,7 +12,7 @@ const owner = ownerDb();
 const app = appDb(4);
 const ctx = { spec: { code: 'AAA', minorUnits: 2 }, mode: 'HALF_UP' as const };
 
-/** SQLSTATEs raised by the stock triggers (ADR 0019). */
+/** SQLSTATEs raised by the stock triggers (ADR 0020). */
 const STOCK = {
   concurrentChange: '40001',
   insufficient: 'ST001',
@@ -149,7 +149,7 @@ function moveRow(tenantId: string, m: MoveInput) {
 
 /**
  * Receives into a location the way the API engine does: lock, compute, insert. A receipt
- * that covers units sold below zero first posts their cost true-up (ADR 0020), so every
+ * that covers units sold below zero first posts their cost true-up (ADR 0021), so every
  * intermediate state stays consistent.
  */
 async function receive(
