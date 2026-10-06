@@ -1,13 +1,13 @@
 import { DirectionProvider, MantineProvider, createTheme, useDirection } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
-import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { i18n as I18n } from 'i18next';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { directionOf } from '@autoparts/shared/i18n';
 import { isUnauthenticated } from './api';
-import { AuthProvider, ME_KEY } from './auth';
+import { AuthProvider, ME_KEY, SIGN_IN_META, forgetSession } from './auth';
 
 const theme = createTheme({
   primaryColor: 'blue',
@@ -33,11 +33,17 @@ function DirectionSync({ i18n }: { i18n: I18n }) {
 
 export function createQueryClient(): QueryClient {
   const client: QueryClient = new QueryClient({
-    // A 401 anywhere means the session ended (idle, revoked): drop to the login page.
+    // A 401 anywhere means the session ended (idle, revoked): forget the user's data, then
+    // RequireAuth shows the login page.
     queryCache: new QueryCache({
       onError: (error, query) => {
-        if (isUnauthenticated(error) && query.queryKey[0] !== ME_KEY[0]) {
-          client.setQueryData(ME_KEY, null);
+        if (isUnauthenticated(error) && query.queryKey[0] !== ME_KEY[0]) forgetSession(client);
+      },
+    }),
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _context, mutation) => {
+        if (isUnauthenticated(error) && mutation.meta?.signIn !== SIGN_IN_META.signIn) {
+          forgetSession(client);
         }
       },
     }),
