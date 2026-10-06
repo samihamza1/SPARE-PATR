@@ -18,6 +18,15 @@ export const PERMISSIONS = [
   'catalog.manage',
   'catalog.import',
   'prices.manage',
+  // Inventory (Sprint 4). Seeing quantities only needs a session; values need cost.view.
+  'locations.manage',
+  'fx.manage',
+  'stock.adjust',
+  'stock.transfer',
+  'stock.count',
+  'stock.approve_count',
+  'stock.review',
+  'stock.opening',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -49,8 +58,22 @@ export const SYSTEM_ROLE_TEMPLATES: readonly RoleTemplate[] = [
   {
     code: 'supervisor',
     name: 'Supervisor',
-    permissions: ['audit.read', 'sessions.manage', 'cost.view'],
+    permissions: [
+      'audit.read',
+      'sessions.manage',
+      'cost.view',
+      // Product owner, 2026-10-06: supervisors and owners adjust stock and approve counts.
+      'stock.adjust',
+      'stock.transfer',
+      'stock.count',
+      'stock.approve_count',
+      'stock.review',
+    ],
   },
-  { code: 'accountant', name: 'Accountant', permissions: ['audit.read', 'cost.view'] },
-  { code: 'cashier', name: 'Cashier', permissions: [] },
+  {
+    code: 'accountant',
+    name: 'Accountant',
+    permissions: ['audit.read', 'cost.view', 'fx.manage'],
+  },
+  { code: 'cashier', name: 'Cashier', permissions: ['stock.count'] },
 ];

@@ -66,6 +66,11 @@ describe('users and roles', () => {
       'audit.read',
       'cost.view',
       'sessions.manage',
+      'stock.adjust',
+      'stock.approve_count',
+      'stock.count',
+      'stock.review',
+      'stock.transfer',
     ]);
     expect((await sara.get('/audit-log')).statusCode).toBe(200);
     expect((await sara.get('/users')).statusCode).toBe(403);
