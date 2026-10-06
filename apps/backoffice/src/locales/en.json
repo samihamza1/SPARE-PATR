@@ -624,6 +624,7 @@
       "applied": "Imported",
       "discarded": "Discarded"
     },
-    "createdAt": "Started"
+    "createdAt": "Started",
+    "fileTooLarge": "The file is larger than {{max}}. Split it into smaller files or remove the sheets you do not need."
   }
 }

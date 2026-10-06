@@ -1,3 +1,4 @@
+import { IMPORT_MAX_FILE_BYTES } from '@autoparts/shared';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ar from '../src/locales/ar.json';
@@ -188,6 +189,38 @@ describe('required text fields use the app language, not the browser', () => {
     await settle();
     expect(fieldOf(ar.catalog.chooseVehicle).textContent).toContain(ar.validation.required);
     expect(posted(api, '/catalog/vehicle-aliases')).toEqual([]);
+  });
+});
+
+describe('import file', () => {
+  it('says the file is too large, with the limit, instead of "unreadable"', async () => {
+    const api = new FakeApi()
+      .on('GET /auth/me', ok(me(ALL)))
+      .on('GET /catalog/price-lists', ok([]))
+      .on('GET /currencies', ok(CURRENCIES))
+      .on('GET /catalog/imports', ok([]));
+    api.install();
+    const { container } = await renderApp('/catalog/imports');
+    await screen.findByRole('heading', { name: ar.import.title });
+    const big = new File(['x'], 'stock.xlsx');
+    Object.defineProperty(big, 'size', { value: IMPORT_MAX_FILE_BYTES + 1 });
+    await act(async () => {
+      fireEvent.change(container.querySelector('input[type=file]')!, {
+        target: { files: [big] },
+      });
+      await Promise.resolve();
+    });
+    const limit = new Intl.NumberFormat('ar', {
+      style: 'unit',
+      unit: 'megabyte',
+      maximumFractionDigits: 1,
+    }).format(IMPORT_MAX_FILE_BYTES / 1024 / 1024);
+    const field = screen
+      .getByLabelText(labelled(ar.import.file))
+      .closest('.mantine-InputWrapper-root')!;
+    expect(field.textContent).toContain(ar.import.fileTooLarge.replace('{{max}}', limit));
+    expect(field.textContent).not.toContain(ar.errors.import.unreadable_file);
+    expect(screen.getByRole('button', { name: ar.import.read })).toHaveProperty('disabled', true);
   });
 });
 
