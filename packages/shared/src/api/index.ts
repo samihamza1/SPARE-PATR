@@ -50,6 +50,13 @@ export const ERROR_CODES = [
   'stock.cost_required',
   'stock.review_unresolved',
   'idempotency.conflict',
+  'stock.no_replacement',
+  'stock.unit_mismatch',
+  'opening.not_ready',
+  'opening.exists',
+  'opening.not_applied',
+  'count.not_open',
+  'count.open_exists',
   'server.error',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
