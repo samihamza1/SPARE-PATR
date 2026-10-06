@@ -323,6 +323,20 @@ describe('password change protection', () => {
     expect((await a.get('/auth/me')).statusCode).toBe(401);
   });
 
+  it('lets a signed-in user change the password while sign-in is locked, keeping the lock', async () => {
+    const s = await provisionShop(env);
+    const a = await loggedIn(env, s);
+    for (let i = 0; i < 5; i++) {
+      await new Client(env.app).login(s.slug, 'owner', `wrong ${String(i)} password`);
+    }
+    expect((await change(a, OWNER_PASSWORD, 'changed under attack 1')).statusCode).toBe(204);
+    expect((await a.get('/auth/me')).statusCode).toBe(200);
+    const login = () => new Client(env.app).login(s.slug, 'owner', 'changed under attack 1');
+    expect((await login()).statusCode).toBe(401);
+    env.clock.advance(16 * MINUTE);
+    expect((await login()).statusCode).toBe(200);
+  });
+
   it('limits password changes per user', async () => {
     const s = await provisionShop(env);
     const a = await loggedIn(env, s);
