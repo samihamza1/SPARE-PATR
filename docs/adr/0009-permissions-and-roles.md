@@ -17,7 +17,9 @@ not exist yet (sales, inventory, ledger).
   never trusted. Labels are i18n keys.
 - Platform permissions now: `users.manage`, `roles.manage`, `settings.manage`,
   `devices.manage`, `sessions.manage`, `audit.read`, and `cost.view` (the BRIEF's
-  cashier restriction). Each module adds its own codes when it lands.
+  cashier restriction). Each module adds its own codes when it lands. (Superseded in
+  part by ADR 0017: `users.manage` and `roles.manage` only reach permissions the actor
+  already holds.)
 - **System role templates** are copied into each tenant at provisioning: owner (all),
   supervisor (`audit.read`, `sessions.manage`, `cost.view`), accountant (`audit.read`,
   `cost.view`), cashier (none yet). Tenants may edit them and create their own roles.
@@ -25,7 +27,8 @@ not exist yet (sales, inventory, ledger).
   request.
 - **Lock-out guard**: a change that would leave no active user holding a role with both
   `users.manage` and `roles.manage` is refused (`users.last_admin`). Users cannot
-  archive themselves.
+  archive themselves. (Superseded in part by ADR 0017: such changes are serialised per
+  tenant with an advisory lock.)
 - Grants are revoked (`revoked_at/by`), never deleted; every grant, revoke and role
   change is audited with before/after.
 

@@ -24,7 +24,8 @@ and 12 hours absolute.
   `SameSite=Strict`, `Path=/`, expiring at the absolute limit.
 - **Expiry**: idle limit checked against `last_seen_at` (written at most once a minute),
   absolute limit stored as `expires_at`. Both from tenant settings at check time, so a
-  shorter setting applies to existing sessions.
+  shorter setting applies to existing sessions. (Superseded in part by ADR 0017: the
+  absolute limit is checked against `created_at`; `expires_at` is only an upper bound.)
 - **Revocation**: logout; password change (other sessions); admin password reset,
   user archive and device revocation (all sessions of that user/device).
 - **Login hardening**: unknown shop, unknown user and wrong password give the same
@@ -32,7 +33,9 @@ and 12 hours absolute.
   After `security.maxFailedLogins` (default 5) failures the account locks for
   `security.lockoutMinutes` (default 15). A locked account answers 423 `auth.locked`
   only when the correct password is given. Rate limit: 10 attempts per minute per
-  (IP, shop, username); device enrollment likewise per (IP, shop).
+  (IP, shop, username); device enrollment likewise per (IP, shop). (Superseded in part
+  by ADR 0017: a locked account answers 401 whatever the password, attempts during the
+  lock count and extend it, and `POST /me/password` counts toward the same lockout.)
 - **CSRF**: on top of SameSite=Strict, any POST/PUT/PATCH/DELETE carrying the session
   cookie must send an `Origin` in `ALLOWED_ORIGINS`.
 - **Access control**: every route declares `config.access` as `public`,
@@ -65,13 +68,14 @@ and 12 hours absolute.
 These additions tighten the decision above without changing it.
 
 - **Per-IP limit on credential endpoints**: `/auth/login` and `/devices/enroll` share
-  one bucket per client IP (30 requests a minute by default). It sits on top of the
-  per-account limits. Without it, one address could spray many usernames and make the
-  server run Argon2 without bound.
+  one bucket per client IP (30 requests a minute by default; ADR 0017 adds
+  `/me/password`). It sits on top of the per-account limits. Without it, one address
+  could spray many usernames and make the server run Argon2 without bound.
 - **`TRUST_PROXY`** (API environment) sets Fastify's `trustProxy`. It accepts `true`, a
   number of proxy hops, or a list of addresses or CIDRs. It is unset (no proxy) by
   default. It must be set behind a reverse proxy, or every client shares the proxy's
-  address in rate limits and audit entries.
+  address in rate limits and audit entries. (Superseded in part by ADR 0017: `true` is
+  refused; prefer the proxy addresses.)
 - **Rate-limit store**: kept in process memory, so limits apply per API instance. When
   more than one instance runs, move the store to Redis (`@fastify/rate-limit` supports
   it).
