@@ -65,7 +65,7 @@ describe('zod schemas on malformed input', () => {
   // Strings that are not decimals, near-decimals decimal.js would parse, and real decimals.
   const anyString = fc.oneof(
     fc.string(),
-    fc.string({ unit: fc.constantFrom(...'0123456789.-+eExX_ ') }),
+    fc.string({ unit: fc.constantFrom(...'0123456789.-+eExX_ '.split('')) }),
     fc.constantFrom('', 'abc', '1e3', '01', '.5', '5.', '-', '0x10', 'NaN', 'Infinity', ' 1'),
     decimalArb(),
     positiveDecimalArb(),
