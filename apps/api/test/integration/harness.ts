@@ -1,8 +1,11 @@
-import { createDb } from '@autoparts/db';
+import type { DB } from '@autoparts/db';
+import { createDb, withTenant } from '@autoparts/db';
 import { loadRootEnv, requireEnv } from '@autoparts/db/env';
 import { newId } from '@autoparts/shared';
 import type { FastifyInstance } from 'fastify';
 import type { LightMyRequestResponse } from 'fastify';
+import type { Transaction } from 'kysely';
+import { sql } from 'kysely';
 import { afterAll } from 'vitest';
 import { buildServer } from '../../src/server';
 import { provisionTenant } from '../../src/provisioning';
@@ -139,3 +142,44 @@ export async function loggedIn(
 
 export const errorCode = (res: LightMyRequestResponse): unknown =>
   res.json<{ error?: { code?: unknown } }>().error?.code;
+
+/**
+ * Opens an owner transaction in the tenant, runs `lock` in it (e.g. SELECT ... FOR UPDATE)
+ * and keeps it open until `release()`, so a test can line up concurrent requests behind it.
+ */
+export async function holdLock(
+  env: TestEnv,
+  tenantId: string,
+  lock: (trx: Transaction<DB>) => Promise<unknown>,
+): Promise<{ release: () => Promise<void> }> {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let locked!: () => void;
+  const isLocked = new Promise<void>((resolve) => (locked = resolve));
+  const done = withTenant(env.ownerDb, tenantId, async (trx) => {
+    await lock(trx);
+    locked();
+    await released;
+  });
+  await Promise.race([isLocked, done]);
+  return {
+    release: async () => {
+      release();
+      await done;
+    },
+  };
+}
+
+/** Resolves once `count` backends of this database are waiting for a lock. */
+export async function waitForLockWaiters(env: TestEnv, count: number): Promise<void> {
+  for (let i = 0; i < 500; i++) {
+    const { rows } = await sql<{ waiting: number }>`
+      SELECT count(DISTINCT l.pid)::int AS waiting
+      FROM pg_locks l
+      JOIN pg_stat_activity a ON a.pid = l.pid
+      WHERE NOT l.granted AND a.datname = current_database()`.execute(env.ownerDb);
+    if ((rows[0]?.waiting ?? 0) >= count) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`timed out waiting for ${String(count)} lock waiters`);
+}

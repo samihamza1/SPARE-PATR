@@ -65,8 +65,7 @@
   "errors": {
     "network": "Cannot reach the server",
     "auth": {
-      "invalid_credentials": "Shop code, username or password is incorrect",
-      "locked": "This account is temporarily locked after failed attempts; try again later",
+      "invalid_credentials": "Incorrect shop code, username or password, or the account is temporarily locked",
       "unauthenticated": "Your session has ended; please sign in again",
       "forbidden": "You do not have permission for this",
       "bad_origin": "Request refused for security reasons",

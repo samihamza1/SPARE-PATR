@@ -10,9 +10,11 @@ import {
   MINUTE,
   OWNER_PASSWORD,
   errorCode,
+  holdLock,
   loggedIn,
   provisionShop,
   setupEnv,
+  waitForLockWaiters,
 } from './harness';
 
 const env = setupEnv();
@@ -71,25 +73,101 @@ describe('login', () => {
 });
 
 describe('lockout', () => {
-  it('locks after 5 failures for 15 minutes, then recovers', async () => {
-    const s = await provisionShop(env);
-    for (let i = 0; i < 5; i++) {
-      expect(
-        (await new Client(env.app).login(s.slug, 'owner', `wrong ${String(i)} password`))
-          .statusCode,
-      ).toBe(401);
+  const attempt = (s: Shop, password: string) =>
+    new Client(env.app).login(s.slug, 'owner', password);
+  const failWrong = async (s: Shop, times: number) => {
+    for (let i = 0; i < times; i++) {
+      expect((await attempt(s, `wrong ${String(i)} password`)).statusCode).toBe(401);
     }
-    const locked = await new Client(env.app).login(s.slug, 'owner', OWNER_PASSWORD);
-    expect(locked.statusCode).toBe(423);
-    expect(errorCode(locked)).toBe('auth.locked');
-    // A wrong password while locked does not reveal the lock.
-    expect(errorCode(await new Client(env.app).login(s.slug, 'owner', 'still wrong 1'))).toBe(
-      'auth.invalid_credentials',
+  };
+  const lockState = (s: Shop) =>
+    withTenant(env.ownerDb, s.tenantId, (trx) =>
+      trx
+        .selectFrom('users')
+        .select(['failed_login_count', 'locked_until'])
+        .where('id', '=', s.ownerUserId)
+        .executeTakeFirstOrThrow(),
     );
-    expect(await auditActions(s.tenantId)).toContain('auth.lockout');
 
-    env.clock.advance(15 * MINUTE);
-    expect((await new Client(env.app).login(s.slug, 'owner', OWNER_PASSWORD)).statusCode).toBe(200);
+  it('answers a locked account exactly like a wrong password, whatever the password', async () => {
+    const s = await provisionShop(env);
+    await failWrong(s, 5);
+    // Locked: the right password must not be distinguishable from a wrong one.
+    for (const password of [OWNER_PASSWORD, 'still wrong 1']) {
+      const res = await attempt(s, password);
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toEqual({ error: { code: 'auth.invalid_credentials' } });
+      expect(res.cookies).toEqual([]);
+    }
+    const actions = await auditActions(s.tenantId);
+    expect(actions.filter((a) => a === 'auth.lockout')).toHaveLength(1);
+    const reasons = await withTenant(env.ownerDb, s.tenantId, (trx) =>
+      trx
+        .selectFrom('audit_log')
+        .select('after')
+        .where('action', '=', 'auth.login_failed')
+        .orderBy('id')
+        .execute(),
+    );
+    expect(reasons.map((r) => (r.after as { reason: string }).reason)).toEqual([
+      'bad_password',
+      'bad_password',
+      'bad_password',
+      'bad_password',
+      'locked',
+      'locked',
+    ]);
+  });
+
+  it('counts attempts during the lock and extends it', async () => {
+    const s = await provisionShop(env);
+    await failWrong(s, 5);
+    env.clock.advance(10 * MINUTE);
+    await failWrong(s, 1);
+    // 20 minutes after the lock: past the first 15, but the attempt at 10 extended it.
+    env.clock.advance(10 * MINUTE);
+    expect((await attempt(s, OWNER_PASSWORD)).statusCode).toBe(401);
+    expect((await lockState(s)).failed_login_count).toBe(7);
+    env.clock.advance(16 * MINUTE);
+    expect((await attempt(s, OWNER_PASSWORD)).statusCode).toBe(200);
+  });
+
+  it('a correct password after the lock expires works and resets the counter', async () => {
+    const s = await provisionShop(env);
+    await failWrong(s, 5);
+    env.clock.advance(16 * MINUTE);
+    expect((await attempt(s, OWNER_PASSWORD)).statusCode).toBe(200);
+    expect(await lockState(s)).toEqual({ failed_login_count: 0, locked_until: null });
+    // Fewer than 5 new failures do not lock (10 attempts: the per-minute rate limit).
+    await failWrong(s, 3);
+    expect((await attempt(s, OWNER_PASSWORD)).statusCode).toBe(200);
+  });
+
+  it('locks again on the next failure after a lock expires, until a successful sign-in', async () => {
+    const s = await provisionShop(env);
+    await failWrong(s, 5);
+    env.clock.advance(16 * MINUTE);
+    await failWrong(s, 1);
+    expect((await attempt(s, OWNER_PASSWORD)).statusCode).toBe(401);
+    env.clock.advance(16 * MINUTE);
+    expect((await attempt(s, OWNER_PASSWORD)).statusCode).toBe(200);
+  });
+
+  it('decides the lock atomically: a correct password queued behind the locking failure fails', async () => {
+    const s = await provisionShop(env);
+    await failWrong(s, 4);
+    // Hold the user row so both attempts are past the password check and wait to record.
+    const held = await holdLock(env, s.tenantId, (trx) =>
+      trx.selectFrom('users').select('id').where('id', '=', s.ownerUserId).forUpdate().execute(),
+    );
+    const fifthFailure = attempt(s, 'wrong 4 password');
+    await waitForLockWaiters(env, 1);
+    const correct = attempt(s, OWNER_PASSWORD);
+    await waitForLockWaiters(env, 2);
+    await held.release();
+    expect((await fifthFailure).statusCode).toBe(401);
+    expect((await correct).statusCode).toBe(401);
+    expect((await lockState(s)).failed_login_count).toBe(6);
   });
 });
 

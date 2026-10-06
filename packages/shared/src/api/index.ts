@@ -11,8 +11,8 @@ import { tenantSettingsSchema } from '../settings';
  */
 
 export const ERROR_CODES = [
+  // Also a temporarily locked account, whatever the password (ADR 0017).
   'auth.invalid_credentials',
-  'auth.locked',
   'auth.unauthenticated',
   'auth.forbidden',
   'auth.bad_origin',
