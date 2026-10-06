@@ -106,9 +106,20 @@
       "concurrent_change": "Stock changed at the same moment; try again",
       "has_stock": "Not possible while there is stock",
       "cost_required": "Enter a unit cost: this part has no known cost yet",
-      "review_unresolved": "Not resolved yet: the stock is still below zero or has no cost"
+      "review_unresolved": "Not resolved yet: the stock is still below zero or has no cost",
+      "no_replacement": "This part has no active replacement",
+      "unit_mismatch": "The replacement part uses a different unit"
     },
     "idempotency": { "conflict": "This document was already sent with different content" },
+    "opening": {
+      "not_ready": "Some lines still need a cost or a quantity",
+      "exists": "Opening stock for this import already exists",
+      "not_applied": "Apply the import before entering opening stock"
+    },
+    "count": {
+      "not_open": "This count is closed",
+      "open_exists": "A count is already open at this location"
+    },
     "server": { "error": "Something went wrong" }
   },
   "permissions": {
