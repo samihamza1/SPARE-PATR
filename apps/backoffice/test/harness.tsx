@@ -1,21 +1,37 @@
-import type { MeResponse, Permission, Role, User } from '@autoparts/shared';
-import { render } from '@testing-library/react';
+import type {
+  MeResponse,
+  PartDetail,
+  PartSummary,
+  Permission,
+  Role,
+  User,
+} from '@autoparts/shared';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 import { App } from '../src/App';
 import { LANGUAGE_KEY } from '../src/auth';
 import { setupI18n } from '../src/i18n';
+import ar from '../src/locales/ar.json';
 import { Providers, createQueryClient } from '../src/Providers';
 
-type Handler = (body: unknown) => { status: number; body?: unknown };
+type Handler = (body: unknown, query: URLSearchParams) => { status: number; body?: unknown };
 
 /** A tiny fake of the API: "METHOD /path" -> handler. Unmatched requests fail the test. */
 export class FakeApi {
   readonly calls: { method: string; path: string; query: string; body: unknown }[] = [];
   private readonly routes = new Map<string, Handler>();
+  private readonly unreachable = new Set<string>();
 
   on(route: string, handler: Handler | { status: number; body?: unknown }): this {
+    this.unreachable.delete(route);
     this.routes.set(route, typeof handler === 'function' ? handler : () => handler);
+    return this;
+  }
+
+  /** The request never reaches the server (fetch rejects, as when the network is down). */
+  offline(route: string): this {
+    this.unreachable.add(route);
     return this;
   }
 
@@ -25,11 +41,14 @@ export class FakeApi {
       const [path = '', query = ''] = url.replace(/^\/api/, '').split('?');
       const body: unknown = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
       this.calls.push({ method, path, query, body });
+      if (this.unreachable.has(`${method} ${path}`)) {
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
       const handler = this.routes.get(`${method} ${path}`);
       if (handler === undefined) {
         return Promise.reject(new Error(`Unexpected request ${method} ${path}`));
       }
-      const res = handler(body);
+      const res = handler(body, new URLSearchParams(query));
       return Promise.resolve(
         new Response(res.status === 204 ? null : JSON.stringify(res.body ?? {}), {
           status: res.status,
@@ -111,12 +130,78 @@ export async function renderApp(route: string, lng?: string) {
   // An explicit language means this browser chose it; otherwise the tenant default applies.
   if (lng !== undefined) localStorage.setItem(LANGUAGE_KEY, lng);
   const i18n = await setupI18n(lng);
+  const queryClient = createQueryClient();
   const utils = render(
-    <Providers i18n={i18n} queryClient={createQueryClient()} env="test">
+    <Providers i18n={i18n} queryClient={queryClient} env="test">
       <MemoryRouter initialEntries={[route]}>
         <App />
       </MemoryRouter>
     </Providers>,
   );
-  return { ...utils, i18n };
+  return { ...utils, i18n, queryClient };
+}
+
+export const unauthenticated = { status: 401, body: { error: { code: 'auth.unauthenticated' } } };
+export const notFound = { status: 404, body: { error: { code: 'resource.not_found' } } };
+export const ok = (body: unknown) => ({ status: 200, body });
+
+/** Deterministic UUIDs for fixtures. */
+export const id = (n: number) => `01900000-0000-7000-8000-${String(n).padStart(12, '0')}`;
+
+export const part = (
+  n: number,
+  sku: string,
+  grade: PartSummary['qualityGrade'],
+  nameAr: string,
+  overrides: Partial<PartSummary> = {},
+): PartSummary => ({
+  id: id(n),
+  sku,
+  nameAr,
+  nameEn: null,
+  qualityGrade: grade,
+  brandId: null,
+  categoryId: null,
+  unit: 'piece',
+  archivedAt: null,
+  ...overrides,
+});
+
+export const partDetail = (
+  summary: PartSummary,
+  overrides: Partial<PartDetail> = {},
+): PartDetail => ({
+  ...summary,
+  notes: null,
+  numbers: [],
+  fitments: [],
+  interchange: [],
+  supersededBy: null,
+  supersedes: [],
+  prices: [],
+  ...overrides,
+});
+
+/** The part and the lookups its page loads. */
+export function onPartPage(api: FakeApi, detail: PartDetail): FakeApi {
+  return api
+    .on(`GET /catalog/parts/${detail.id}`, ok(detail))
+    .on(`GET /catalog/parts/${detail.id}/prices`, ok([]))
+    .on('GET /catalog/brands', ok([]))
+    .on('GET /catalog/categories', ok([]))
+    .on('GET /catalog/price-lists', ok([]));
+}
+
+/** Fills the sign-in form and submits it. */
+export function signIn(username: string) {
+  fireEvent.change(screen.getByLabelText(ar.auth.shopCode, { exact: false }), {
+    target: { value: 'sky-motors' },
+  });
+  fireEvent.change(screen.getByLabelText(ar.auth.username, { exact: false }), {
+    target: { value: username },
+  });
+  fireEvent.change(screen.getByLabelText(ar.auth.password, { exact: false }), {
+    target: { value: 'a long passphrase' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: ar.auth.submit }));
 }

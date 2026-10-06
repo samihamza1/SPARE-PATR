@@ -22,7 +22,8 @@
     "username": "Username",
     "password": "Password",
     "submit": "Sign in",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "logoutFailed": "Sign-out failed: you are still signed in. Try again before leaving this device."
   },
   "home": {
     "welcome": "Welcome, {{name}}",

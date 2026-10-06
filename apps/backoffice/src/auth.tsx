@@ -1,13 +1,17 @@
 import type { MeResponse, Permission } from '@autoparts/shared';
 import { isSupportedLocale } from '@autoparts/shared/i18n';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useReducer, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router';
 import { api, isUnauthenticated } from './api';
 
 export const ME_KEY = ['me'] as const;
+
+/** Marks the sign-in request: its 401 means "wrong credentials", not "session ended". */
+export const SIGN_IN_META = { signIn: true } as const;
 
 interface AuthValue {
   me: MeResponse | null;
@@ -16,6 +20,7 @@ interface AuthValue {
   signedOut: boolean;
   can: (permission: Permission) => boolean;
   login: (input: { tenant: string; username: string; password: string }) => Promise<MeResponse>;
+  /** Resolves once the server ended the session; rejects (user still signed in) otherwise. */
   logout: () => Promise<void>;
 }
 
@@ -25,10 +30,29 @@ const AuthContext = createContext<AuthValue | null>(null);
 export const SHOP_CODE_KEY = 'autoparts.shopCode';
 export const LANGUAGE_KEY = 'autoparts.language';
 
+/**
+ * Forgets everything cached for the signed-in user (signed out, or the session ended), so
+ * the next user of this browser, maybe from another shop, never sees or saves it.
+ */
+export function forgetSession(queryClient: QueryClient): void {
+  queryClient.clear();
+  queryClient.setQueryData(ME_KEY, null);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const { i18n } = useTranslation();
   const [signedOut, setSignedOut] = useState(false);
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
+
+  // clear() detaches the `me` observer from its query; render again to pick up the new one.
+  useEffect(
+    () =>
+      queryClient.getQueryCache().subscribe((event) => {
+        if (event.type === 'removed' && event.query.queryHash === hashKey(ME_KEY)) rerender();
+      }),
+    [queryClient],
+  );
 
   const meQuery = useQuery({
     queryKey: ME_KEY,
@@ -53,9 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: (input: { tenant: string; username: string; password: string }) =>
       api<MeResponse>('POST', '/auth/login', input),
+    meta: SIGN_IN_META,
     onSuccess: (data, input) => {
       setSignedOut(false);
       localStorage.setItem(SHOP_CODE_KEY, input.tenant);
+      // Every sign-in starts from an empty cache, whoever used this browser before.
+      queryClient.clear();
       queryClient.setQueryData(ME_KEY, data);
     },
   });
@@ -67,12 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     can: (permission) => me?.permissions.includes(permission) ?? false,
     login: (input) => loginMutation.mutateAsync(input),
     logout: async () => {
-      await api('POST', '/auth/logout').catch(() => undefined);
+      // Only the server can end the session (the cookie is HttpOnly). If it could not, the
+      // user stays signed in and is told so; a 401 means the session had already ended.
+      await api('POST', '/auth/logout').catch((error: unknown) => {
+        if (!isUnauthenticated(error)) throw error;
+      });
       setSignedOut(true);
-      // Update the observed `me` query in place (clear() would detach its observer and leave
-      // the old user on screen), then drop everything cached for the previous user.
-      queryClient.setQueryData(ME_KEY, null);
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
+      forgetSession(queryClient);
     },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
