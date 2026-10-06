@@ -69,7 +69,8 @@
       "unauthenticated": "Your session has ended; please sign in again",
       "forbidden": "You do not have permission for this",
       "bad_origin": "Request refused for security reasons",
-      "wrong_password": "The current password is incorrect"
+      "wrong_password": "The current password is incorrect",
+      "exceeds_own_permissions": "Not allowed: this involves permissions you do not have yourself"
     },
     "request": {
       "invalid": "Some values are not valid",

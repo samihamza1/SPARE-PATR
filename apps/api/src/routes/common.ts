@@ -1,6 +1,7 @@
 import type { DB } from '@autoparts/db';
 import { withTenant } from '@autoparts/db';
-import type { MeResponse } from '@autoparts/shared';
+import { toPermissions } from '@autoparts/shared';
+import type { MeResponse, Permission } from '@autoparts/shared';
 import type { FastifyRequest } from 'fastify';
 import type { Transaction } from 'kysely';
 import { sql } from 'kysely';
@@ -8,7 +9,8 @@ import type { AuditActor } from '../audit';
 import type { AuthContext } from '../auth/context';
 import type { PlatformDeps } from '../auth/plugin';
 import { authOf } from '../auth/plugin';
-import { ApiError } from '../errors';
+import { loadPermissions } from '../auth/sessions';
+import { ApiError, notFound } from '../errors';
 
 export type Trx = Transaction<DB>;
 
@@ -34,9 +36,57 @@ export function actorOf(request: FastifyRequest): AuditActor {
 
 export const iso = (d: Date | null): string | null => (d === null ? null : d.toISOString());
 
+/** Advisory-lock namespace (first key) for changes to who administers a tenant. */
+const ADMIN_CHANGES_LOCK = 1_094_995_278;
+
+/**
+ * Serialises, per tenant, every change to roles, user roles, passwords set by an admin
+ * and archiving (ADR 0017). Take it first, before any check reads permissions or admins:
+ * otherwise two concurrent changes can each pass assertAdminRemains while the other is
+ * still uncommitted, and together leave no administrator. Released at commit/rollback.
+ */
+export async function lockAdminChanges(trx: Trx, tenantId: string): Promise<void> {
+  await sql`SELECT pg_advisory_xact_lock(${ADMIN_CHANGES_LOCK}::int, hashtext(${tenantId}::text))`.execute(
+    trx,
+  );
+}
+
+const exceedsOwnPermissions = () => new ApiError(403, 'auth.exceeds_own_permissions');
+
+/**
+ * No privilege escalation (ADR 0017): an actor may only grant, remove or define
+ * permissions it holds itself, and only act on users whose permissions it holds. The
+ * actor's permissions are re-read here, in the transaction, after lockAdminChanges.
+ */
+export async function privilegeGuard(trx: Trx, auth: AuthContext) {
+  const own = await loadPermissions(trx, auth.userId);
+  const assertHeld = (permissions: Iterable<Permission>): void => {
+    for (const p of permissions) if (!own.has(p)) throw exceedsOwnPermissions();
+  };
+  return {
+    /** Every permission in the set must be one the actor holds. */
+    permissions: assertHeld,
+    /** The user's effective permissions must all be held by the actor. */
+    user: async (userId: string): Promise<void> => {
+      assertHeld(await loadPermissions(trx, userId));
+    },
+    /** The role's permissions must all be held by the actor; 404 if there is no such role. */
+    role: async (roleId: string): Promise<void> => {
+      const role = await trx
+        .selectFrom('roles')
+        .select('permissions')
+        .where('id', '=', roleId)
+        .executeTakeFirst();
+      if (role === undefined) throw notFound();
+      assertHeld(toPermissions(role.permissions));
+    },
+  };
+}
+
 /**
  * Refuses a change that would leave no active user holding a role with both users.manage
- * and roles.manage; otherwise a tenant could lock itself out of administration.
+ * and roles.manage; otherwise a tenant could lock itself out of administration. Call it
+ * only after lockAdminChanges.
  */
 export async function assertAdminRemains(trx: Trx): Promise<void> {
   const row = await trx

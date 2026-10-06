@@ -17,6 +17,8 @@ export const ERROR_CODES = [
   'auth.forbidden',
   'auth.bad_origin',
   'auth.wrong_password',
+  // Granting or defining permissions the actor lacks, or managing a user who has them.
+  'auth.exceeds_own_permissions',
   'request.invalid',
   'request.rate_limited',
   'resource.not_found',
