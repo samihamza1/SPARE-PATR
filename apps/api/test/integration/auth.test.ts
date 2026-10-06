@@ -8,6 +8,7 @@ import {
   Client,
   HOUR,
   MINUTE,
+  ORIGIN,
   OWNER_PASSWORD,
   errorCode,
   holdLock,
@@ -257,6 +258,107 @@ describe('session lifecycle', () => {
         }),
       ),
     ).toBe('auth.wrong_password');
+  });
+});
+
+describe('password change protection', () => {
+  const change = (client: Client, currentPassword: string, newPassword = 'next passphrase 1') =>
+    client.post('/me/password', { currentPassword, newPassword });
+  const sessionsOf = (s: Shop) =>
+    withTenant(env.ownerDb, s.tenantId, (trx) =>
+      trx
+        .selectFrom('sessions')
+        .select(['revoked_at', 'revoked_reason'])
+        .where('user_id', '=', s.ownerUserId)
+        .execute(),
+    );
+  const auditOf = (s: Shop, action: string) =>
+    withTenant(env.ownerDb, s.tenantId, (trx) =>
+      trx.selectFrom('audit_log').selectAll().where('action', '=', action).orderBy('id').execute(),
+    );
+
+  it('counts a wrong current password toward the lockout and audits it without secrets', async () => {
+    const s = await provisionShop(env);
+    const a = await loggedIn(env, s);
+    const b = await loggedIn(env, s);
+    for (let i = 0; i < 4; i++) {
+      const res = await change(a, `wrong guess ${String(i)}`);
+      expect(res.statusCode).toBe(400);
+      expect(errorCode(res)).toBe('auth.wrong_password');
+    }
+    expect((await a.get('/auth/me')).statusCode).toBe(200);
+    const failures = await auditOf(s, 'user.password_change_failed');
+    expect(failures).toHaveLength(4);
+    expect(failures[0]).toMatchObject({
+      actor_user_id: s.ownerUserId,
+      entity_type: 'user',
+      entity_id: s.ownerUserId,
+      after: { reason: 'wrong_password', locked: false },
+    });
+    expect(JSON.stringify(failures)).not.toMatch(/wrong guess|next passphrase|argon2/);
+
+    // The fifth failure locks the account and ends every session, this one included.
+    const fifth = await change(a, 'wrong guess 4');
+    expect(errorCode(fifth)).toBe('auth.wrong_password');
+    expect(fifth.cookies.find((c) => c.name === 'sid')?.value).toBe('');
+    expect((await sessionsOf(s)).every((x) => x.revoked_reason === 'locked_out')).toBe(true);
+    expect((await b.get('/auth/me')).statusCode).toBe(401);
+    expect((await a.get('/auth/me')).statusCode).toBe(401);
+    expect((await new Client(env.app).login(s.slug, 'owner', OWNER_PASSWORD)).statusCode).toBe(401);
+    expect(await auditOf(s, 'auth.lockout')).toHaveLength(1);
+    expect((await auditOf(s, 'user.password_change_failed')).at(-1)?.after).toMatchObject({
+      locked: true,
+    });
+  });
+
+  it('shares one failure counter with sign-in', async () => {
+    const s = await provisionShop(env);
+    const a = await loggedIn(env, s);
+    for (let i = 0; i < 3; i++) {
+      await new Client(env.app).login(s.slug, 'owner', `wrong ${String(i)} password`);
+    }
+    expect(errorCode(await change(a, 'wrong guess 1'))).toBe('auth.wrong_password');
+    expect((await a.get('/auth/me')).statusCode).toBe(200);
+    expect(errorCode(await change(a, 'wrong guess 2'))).toBe('auth.wrong_password');
+    expect((await a.get('/auth/me')).statusCode).toBe(401);
+  });
+
+  it('limits password changes per user', async () => {
+    const s = await provisionShop(env);
+    const a = await loggedIn(env, s);
+    let current = OWNER_PASSWORD;
+    for (let i = 0; i < 5; i++) {
+      const next = `rotated passphrase ${String(i)}`;
+      expect((await change(a, current, next)).statusCode).toBe(204);
+      current = next;
+    }
+    const limited = await change(a, current, 'rotated passphrase 9');
+    expect(limited.statusCode).toBe(429);
+    expect(errorCode(limited)).toBe('request.rate_limited');
+    // Another user of the same shop is not affected.
+    const other = await loggedIn(env, shop);
+    expect(errorCode(await change(other, 'not the password'))).toBe('auth.wrong_password');
+  });
+
+  it('shares the per-IP credential limit with sign-in', async () => {
+    const app = buildServer({
+      checkDatabase: () => Promise.resolve(),
+      platform: {
+        db: env.appDb,
+        allowedOrigins: [ORIGIN],
+        cookieSecure: true,
+        now: () => env.clock.now,
+        ipAttemptsPerMinute: 3,
+      },
+    });
+    const s = await provisionShop(env);
+    const client = new Client(app);
+    expect((await client.login(s.slug, 'owner', OWNER_PASSWORD)).statusCode).toBe(200);
+    expect((await change(client, 'wrong guess 1')).statusCode).toBe(400);
+    expect((await change(client, 'wrong guess 2')).statusCode).toBe(400);
+    expect((await change(client, 'wrong guess 3')).statusCode).toBe(429);
+    expect((await new Client(app).login(s.slug, 'owner', OWNER_PASSWORD)).statusCode).toBe(429);
+    await app.close();
   });
 });
 

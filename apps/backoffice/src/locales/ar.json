@@ -221,7 +221,8 @@
         "update": "تعديل مستخدم",
         "archive": "أرشفة مستخدم",
         "password_reset": "تعيين كلمة مرور",
-        "password_change": "تغيير كلمة المرور"
+        "password_change": "تغيير كلمة المرور",
+        "password_change_failed": "كلمة مرور حالية خاطئة عند تغيير كلمة المرور"
       },
       "role": {
         "create": "إنشاء دور",
