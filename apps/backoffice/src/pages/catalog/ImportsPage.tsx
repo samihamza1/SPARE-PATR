@@ -100,8 +100,17 @@ function History() {
   );
 }
 
+/** The upload limit in megabytes, in the user's language (e.g. "10 MB"). */
+export function maxFileSize(language: string): string {
+  return new Intl.NumberFormat(language, {
+    style: 'unit',
+    unit: 'megabyte',
+    maximumFractionDigits: 1,
+  }).format(IMPORT_MAX_FILE_BYTES / 1024 / 1024);
+}
+
 export function ImportsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const priceLists = usePriceLists();
   const currencies = useCurrencies();
@@ -190,7 +199,9 @@ export function ImportsPage() {
               accept=".xlsx,.csv"
               value={file}
               onChange={setFile}
-              error={tooLarge ? t('errors.import.unreadable_file') : undefined}
+              error={
+                tooLarge ? t('import.fileTooLarge', { max: maxFileSize(i18n.language) }) : undefined
+              }
             />
             <Button
               disabled={file === null || tooLarge}
