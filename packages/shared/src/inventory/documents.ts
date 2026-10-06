@@ -203,6 +203,16 @@ export const openingDraftSchema = z.object({
 });
 export type OpeningDraft = z.infer<typeof openingDraftSchema>;
 
+export const openingSummarySchema = z.object({
+  id: uuidSchema,
+  batchId: uuidSchema,
+  fileName: z.string(),
+  status: z.enum(['draft', 'posted', 'discarded']),
+  createdAt: timestampSchema,
+  postedAt: timestampSchema.nullable(),
+});
+export type OpeningSummary = z.infer<typeof openingSummarySchema>;
+
 export const listOpeningLinesQuerySchema = z.object({
   status: z.enum(OPENING_LINE_STATUSES).optional(),
   /** Keyset pagination on SKU. */
