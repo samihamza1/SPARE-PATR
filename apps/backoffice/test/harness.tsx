@@ -1,4 +1,5 @@
 import type {
+  Currency,
   MeResponse,
   PartDetail,
   PartSummary,
@@ -122,6 +123,31 @@ export const USERS: User[] = [
     archivedAt: null,
     lastLoginAt: null,
     roleIds: [ROLES[0]?.id ?? ''],
+  },
+];
+
+export const SETTINGS = {
+  name: 'Sky Motors',
+  defaultLocale: 'ar',
+  timezone: 'UTC',
+  functionalCurrency: 'AAA',
+  settings: {
+    session: { idleMinutes: 30, absoluteHours: 12 },
+    security: { maxFailedLogins: 5, lockoutMinutes: 15 },
+    money: { roundingMode: 'HALF_EVEN' },
+    inventory: { allowNegativeStock: false },
+  },
+};
+
+export const CURRENCIES: Currency[] = [
+  {
+    id: '01900000-0000-7000-8000-0000000000c1',
+    code: 'AAA',
+    minorUnits: 2,
+    cashIncrement: null,
+    isActive: true,
+    sortOrder: 0,
+    isFunctional: true,
   },
 ];
 

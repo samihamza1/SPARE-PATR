@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ar from '../src/locales/ar.json';
 import {
   ALL,
+  CURRENCIES,
   FakeApi,
+  ROLES,
+  SETTINGS,
+  USERS,
   id,
   me,
   notFound,
@@ -152,5 +156,76 @@ describe('a session that ends mid-use', () => {
     await waitFor(() => {
       expect(api.calls.filter((c) => c.path === `/catalog/parts/${detail.id}`)).toHaveLength(2);
     });
+  });
+});
+
+describe('who am I, after changing it', () => {
+  it("refreshes the menu after changing the user's own roles", async () => {
+    let permissions = ALL;
+    const api = new FakeApi()
+      .on('GET /auth/me', () => ok(me(permissions)))
+      .on('GET /users', ok(USERS))
+      .on('GET /roles', ok(ROLES))
+      .on(`POST /users/${USERS[0]!.id}/roles/${ROLES[0]!.id}/revoke`, () => {
+        permissions = [];
+        return ok({ ...USERS[0]!, roleIds: [] });
+      });
+    api.install();
+    await renderApp('/users');
+    const nav = await screen.findByRole('navigation', { name: ar.nav.menu });
+    await screen.findByText(ar.roles.system.owner);
+    expect(within(nav).getByRole('link', { name: ar.nav.users })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: ar.users.roles }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('checkbox', {
+        name: ar.roles.system.owner,
+      }),
+    );
+    await waitFor(() => {
+      expect(within(nav).queryByRole('link', { name: ar.nav.users })).toBeNull();
+    });
+  });
+
+  it('does not refetch who I am after changing somebody else', async () => {
+    const other = { ...USERS[0]!, id: id(7), username: 'cash1', displayName: 'كاشير' };
+    const api = new FakeApi()
+      .on('GET /auth/me', ok(me(ALL)))
+      .on('GET /users', ok([USERS[0], other]))
+      .on('GET /roles', ok(ROLES))
+      .on(`POST /users/${other.id}/roles/${ROLES[0]!.id}/revoke`, ok({ ...other, roleIds: [] }));
+    api.install();
+    await renderApp('/users');
+    const row = (await screen.findByText('cash1')).closest('tr')!;
+    fireEvent.click(within(row).getByRole('button', { name: ar.users.roles }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('checkbox', {
+        name: ar.roles.system.owner,
+      }),
+    );
+    await waitFor(() => {
+      expect(api.calls.filter((c) => c.path === '/users')).toHaveLength(2);
+    });
+    expect(api.calls.filter((c) => c.path === '/auth/me')).toHaveLength(1);
+  });
+
+  it('shows the new shop name in the header after saving the settings', async () => {
+    let name = 'Sky Motors';
+    const api = new FakeApi()
+      .on('GET /auth/me', () => ok({ ...me(ALL), tenant: { ...me(ALL).tenant, name } }))
+      .on('GET /settings', () => ok({ ...SETTINGS, name }))
+      .on('GET /currencies', ok(CURRENCIES))
+      .on('PUT /settings', (body) => {
+        name = (body as { name: string }).name;
+        return ok({ ...SETTINGS, name });
+      });
+    api.install();
+    await renderApp('/settings');
+    const header = await screen.findByRole('banner');
+    const shopName = await screen.findByLabelText(ar.settings.shopName, { exact: false });
+    await within(header).findByText('Sky Motors');
+    fireEvent.change(shopName, { target: { value: 'Sky Motors Jeddah' } });
+    fireEvent.click(screen.getByRole('button', { name: ar.common.save }));
+    await within(header).findByText('Sky Motors Jeddah');
   });
 });
