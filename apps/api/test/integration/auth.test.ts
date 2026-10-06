@@ -116,6 +116,26 @@ describe('session lifecycle', () => {
     expect((await client.get('/auth/me')).statusCode).toBe(401);
   });
 
+  it('applies a shorter absolute limit to existing sessions', async () => {
+    const s = await provisionShop(env);
+    const owner = await loggedIn(env, s);
+    const other = await loggedIn(env, s);
+    for (let i = 0; i < 2; i++) {
+      env.clock.advance(20 * MINUTE);
+      expect((await owner.get('/auth/me')).statusCode).toBe(200);
+      expect((await other.get('/auth/me')).statusCode).toBe(200);
+    }
+    const { settings } = (await owner.get('/settings')).json<{ settings: object }>();
+    const shorter = { ...settings, session: { idleMinutes: 30, absoluteHours: 1 } };
+    expect((await owner.put('/settings', { settings: shorter })).statusCode).toBe(200);
+    expect((await other.get('/auth/me')).statusCode).toBe(200);
+    env.clock.advance(20 * MINUTE);
+    // Signed in 60 minutes ago, with a 12-hour limit at the time; now the limit is 1 hour.
+    expect((await other.get('/auth/me')).statusCode).toBe(401);
+    expect((await owner.get('/auth/me')).statusCode).toBe(401);
+    expect((await loggedIn(env, s).then((c) => c.get('/auth/me'))).statusCode).toBe(200);
+  });
+
   it('logout revokes the session server-side', async () => {
     const client = await loggedIn(env, shop);
     const token = client.cookie;
