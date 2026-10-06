@@ -1,6 +1,6 @@
 -- migrate:up
 
--- Exchange rates entered by hand, usually daily (product owner, 2026-10-06; ADR 0018).
+-- Exchange rates entered by hand, usually daily (product owner, 2026-10-06; ADR 0019).
 -- Stored as the market quotes them: 1 base_currency = rate quote_currency. One side is the
 -- tenant's functional currency. Append-only: a correction is a newer row for the same date;
 -- the rate in effect for a date is the latest row dated on or before it.
