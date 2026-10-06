@@ -53,7 +53,69 @@
     "locale": "اللغة",
     "minorUnits": "الخانات العشرية",
     "cashIncrement": "أصغر فئة نقدية",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "tenant": "رمز المحل",
+    "currentPassword": "كلمة المرور الحالية",
+    "id": "معرّف السجل",
+    "roleId": "الدور",
+    "permissions": "الصلاحيات",
+    "defaultLocale": "اللغة الافتراضية",
+    "session": "الجلسات",
+    "idleMinutes": "مهلة الخمول (دقائق)",
+    "absoluteHours": "أقصى مدة للجلسة (ساعات)",
+    "security": "الأمان",
+    "maxFailedLogins": "محاولات الدخول الفاشلة قبل القفل",
+    "lockoutMinutes": "مدة القفل (دقائق)",
+    "money": "المال",
+    "roundingMode": "طريقة التقريب",
+    "inventory": "المخزون",
+    "allowNegativeStock": "المخزون السالب",
+    "sortOrder": "الترتيب",
+    "isActive": "مفعّلة",
+    "kind": "النوع",
+    "archived": "مؤرشف",
+    "parentId": "الأصل",
+    "nameAr": "الاسم بالعربية",
+    "nameEn": "الاسم بالإنجليزية",
+    "level": "المستوى",
+    "yearFrom": "من سنة",
+    "yearTo": "إلى سنة",
+    "engineCode": "رمز المحرك",
+    "displacementCc": "السعة (سي سي)",
+    "fuel": "الوقود",
+    "alias": "الكلمة",
+    "target": "تعني",
+    "vehicleId": "السيارة",
+    "categoryId": "الفئة",
+    "number": "رقم القطعة",
+    "brandId": "الماركة",
+    "sku": "رمز الصنف",
+    "qualityGrade": "الجودة",
+    "unit": "الوحدة",
+    "notes": "ملاحظات",
+    "numbers": "أرقام القطعة",
+    "ids": "القطع المحددة",
+    "set": "التعديلات",
+    "note": "ملاحظة",
+    "newPartId": "القطعة البديلة",
+    "effectiveAt": "يسري من",
+    "reason": "السبب",
+    "partId": "القطعة",
+    "currency": "العملة",
+    "isDefault": "افتراضية",
+    "price": "السعر",
+    "priceListId": "قائمة الأسعار",
+    "fileName": "اسم الملف",
+    "contentBase64": "الملف",
+    "sheet": "الورقة",
+    "headerRow": "صف العناوين",
+    "mapping": "ربط الأعمدة",
+    "columns": "الأعمدة",
+    "numberKind": "نوع أرقام القطع",
+    "costCurrency": "عملة التكلفة",
+    "skuPrefix": "بادئة رمز الصنف",
+    "rowIds": "الصفوف",
+    "skipped": "متخطّى"
   },
   "validation": {
     "invalid": "قيمة غير صالحة",
@@ -61,6 +123,33 @@
       "too_short": "كلمة المرور قصيرة، 10 أحرف على الأقل",
       "too_long": "كلمة المرور طويلة جداً",
       "too_common": "كلمة المرور شائعة جداً، اختر غيرها"
+    },
+    "required": "مطلوب",
+    "withField": "{{field}}: {{message}}",
+    "id": {
+      "not_uuid_v7": "معرّف السجل غير صالح؛ أعد تحميل الصفحة وحاول مجدداً"
+    },
+    "name": {
+      "required": "أدخل اسماً بالعربية أو بالإنجليزية"
+    },
+    "sku": {
+      "invalid": "استخدم حروفاً إنجليزية وأرقاماً و . _ / - فقط، على أن يبدأ بحرف أو رقم (حتى 40)"
+    },
+    "price": {
+      "negative": "لا يمكن أن يكون السعر سالباً"
+    },
+    "alias": {
+      "target_mismatch": "اختر السيارة أو الفئة التي تعنيها هذه الكلمة"
+    },
+    "bulk": {
+      "nothing_to_set": "اختر ما تريد تغييره"
+    },
+    "import": {
+      "mapping_needs_identity": "اربط عمود رقم القطعة أو الاسم بالإنجليزية أو الاسم بالعربية",
+      "mapping_needs_price_list": "اختر قائمة الأسعار لسعر البيع",
+      "mapping_needs_cost_currency": "اختر عملة عمود التكلفة",
+      "mapping_needs_sku": "اربط عمود رمز الصنف أو أدخل بادئة رمز الصنف",
+      "mapping_duplicate_column": "عمود واحد مربوط بأكثر من حقل"
     }
   },
   "errors": {

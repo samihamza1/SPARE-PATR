@@ -22,6 +22,7 @@ import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { VehiclePicker, catalogKeys, categoryName, useCategories } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Form, useRequired } from '../../forms';
 
 const years = (v: Vehicle) =>
   v.yearFrom === null && v.yearTo === null
@@ -36,6 +37,7 @@ function AddVehicle({ parent, onAdded }: { parent: Vehicle; onAdded: () => void 
   const [from, setFrom] = useState<number | null>(null);
   const [to, setTo] = useState<number | null>(null);
   const [engine, setEngine] = useState('');
+  const required = useRequired({ name });
   const add = useMutation({
     mutationFn: () =>
       api('POST', '/catalog/vehicles', {
@@ -51,6 +53,7 @@ function AddVehicle({ parent, onAdded }: { parent: Vehicle; onAdded: () => void 
       setName('');
       setNameAr('');
       setEngine('');
+      required.reset();
       onAdded();
     },
   });
@@ -58,68 +61,68 @@ function AddVehicle({ parent, onAdded }: { parent: Vehicle; onAdded: () => void 
   const toNumber = (v: string | number) => (typeof v === 'number' ? v : null);
   return (
     <Stack gap="xs">
-      <Group
-        component="form"
-        align="flex-end"
-        onSubmit={(e) => {
-          e.preventDefault();
-          add.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) add.mutate();
         }}
       >
-        <TextInput
-          label={`${t('fields.name')} (${t(`catalog.level.${level}`)})`}
-          required
-          dir="ltr"
-          value={name}
-          onChange={(e) => {
-            setName(e.currentTarget.value);
-          }}
-        />
-        <TextInput
-          label={t('vehicles.nameAr')}
-          value={nameAr}
-          onChange={(e) => {
-            setNameAr(e.currentTarget.value);
-          }}
-        />
-        {(level === 'generation' || level === 'engine') && (
-          <>
-            <NumberInput
-              label={t('vehicles.yearFrom')}
-              min={1900}
-              max={2100}
-              allowDecimal={false}
-              value={from ?? ''}
-              onChange={(v) => {
-                setFrom(toNumber(v));
-              }}
-            />
-            <NumberInput
-              label={t('vehicles.yearTo')}
-              min={1900}
-              max={2100}
-              allowDecimal={false}
-              value={to ?? ''}
-              onChange={(v) => {
-                setTo(toNumber(v));
-              }}
-            />
-          </>
-        )}
-        {level === 'engine' && (
+        <Group align="flex-end">
           <TextInput
-            label={t('vehicles.engineCode')}
+            label={`${t('fields.name')} (${t(`catalog.level.${level}`)})`}
+            required
             dir="ltr"
-            value={engine}
+            value={name}
+            error={required.errors.name}
             onChange={(e) => {
-              setEngine(e.currentTarget.value);
+              setName(e.currentTarget.value);
             }}
           />
-        )}
-        <Button type="submit" loading={add.isPending}>
-          {t('vehicles.add')}
-        </Button>
-      </Group>
+          <TextInput
+            label={t('vehicles.nameAr')}
+            value={nameAr}
+            onChange={(e) => {
+              setNameAr(e.currentTarget.value);
+            }}
+          />
+          {(level === 'generation' || level === 'engine') && (
+            <>
+              <NumberInput
+                label={t('vehicles.yearFrom')}
+                min={1900}
+                max={2100}
+                allowDecimal={false}
+                value={from ?? ''}
+                onChange={(v) => {
+                  setFrom(toNumber(v));
+                }}
+              />
+              <NumberInput
+                label={t('vehicles.yearTo')}
+                min={1900}
+                max={2100}
+                allowDecimal={false}
+                value={to ?? ''}
+                onChange={(v) => {
+                  setTo(toNumber(v));
+                }}
+              />
+            </>
+          )}
+          {level === 'engine' && (
+            <TextInput
+              label={t('vehicles.engineCode')}
+              dir="ltr"
+              value={engine}
+              onChange={(e) => {
+                setEngine(e.currentTarget.value);
+              }}
+            />
+          )}
+          <Button type="submit" loading={add.isPending}>
+            {t('vehicles.add')}
+          </Button>
+        </Group>
+      </Form>
       <ErrorAlert error={add.error} />
     </Stack>
   );
@@ -138,6 +141,12 @@ function Aliases() {
   const [target, setTarget] = useState<string | null>('vehicle');
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const required = useRequired({
+    alias,
+    target,
+    ...(target === 'vehicle' && { vehicle }),
+    ...(target === 'category' && { categoryId }),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: catalogKeys.aliases });
   const add = useMutation({
     mutationFn: () =>
@@ -151,6 +160,7 @@ function Aliases() {
     onSuccess: async () => {
       setAlias('');
       setVehicle(null);
+      required.reset();
       await refresh();
     },
   });
@@ -204,57 +214,62 @@ function Aliases() {
         </Table.Tbody>
       </Table>
       {can('catalog.manage') && (
-        <Group
-          component="form"
-          align="flex-end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            add.mutate();
+        <Form
+          onSubmit={() => {
+            if (required.ok()) add.mutate();
           }}
         >
-          <TextInput
-            label={t('vehicles.alias')}
-            required
-            value={alias}
-            onChange={(e) => {
-              setAlias(e.currentTarget.value);
-            }}
-          />
-          <Select
-            label={t('vehicles.mapsTo')}
-            value={target}
-            onChange={setTarget}
-            data={ALIAS_TARGETS.map((x) => ({ value: x, label: t(`vehicles.target.${x}`) }))}
-          />
-          {target === 'vehicle' &&
-            (vehicle === null ? (
-              <VehiclePicker onPick={setVehicle} />
-            ) : (
-              <Badge
-                size="lg"
-                variant="light"
-                onClick={() => {
-                  setVehicle(null);
-                }}
-              >
-                {vehicle.name} ×
-              </Badge>
-            ))}
-          {target === 'category' && (
-            <Select
-              label={t('catalog.category')}
-              value={categoryId}
-              onChange={setCategoryId}
-              data={(categories.data ?? []).map((c) => ({
-                value: c.id,
-                label: categoryName(c, i18n.language),
-              }))}
+          <Group align="flex-end">
+            <TextInput
+              label={t('vehicles.alias')}
+              required
+              value={alias}
+              error={required.errors.alias}
+              onChange={(e) => {
+                setAlias(e.currentTarget.value);
+              }}
             />
-          )}
-          <Button type="submit" loading={add.isPending}>
-            {t('vehicles.addAlias')}
-          </Button>
-        </Group>
+            <Select
+              label={t('vehicles.mapsTo')}
+              required
+              allowDeselect={false}
+              value={target}
+              onChange={setTarget}
+              error={required.errors.target}
+              data={ALIAS_TARGETS.map((x) => ({ value: x, label: t(`vehicles.target.${x}`) }))}
+            />
+            {target === 'vehicle' &&
+              (vehicle === null ? (
+                <VehiclePicker onPick={setVehicle} error={required.errors.vehicle} />
+              ) : (
+                <Badge
+                  size="lg"
+                  variant="light"
+                  onClick={() => {
+                    setVehicle(null);
+                  }}
+                >
+                  {vehicle.name} ×
+                </Badge>
+              ))}
+            {target === 'category' && (
+              <Select
+                label={t('catalog.category')}
+                required
+                value={categoryId}
+                onChange={setCategoryId}
+                error={required.errors.categoryId}
+                data={(categories.data ?? []).map((c) => ({
+                  value: c.id,
+                  label: categoryName(c, i18n.language),
+                }))}
+              />
+            )}
+            <Button type="submit" loading={add.isPending}>
+              {t('vehicles.addAlias')}
+            </Button>
+          </Group>
+        </Form>
       )}
       <ErrorAlert error={aliases.error ?? add.error ?? remove.error} />
     </Card>

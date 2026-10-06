@@ -17,5 +17,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['test/**/*.test.{ts,tsx}'],
     setupFiles: ['./test/setup.ts'],
+    // Journeys through several Mantine dropdowns take seconds when test files run in parallel.
+    testTimeout: 15_000,
   },
 });

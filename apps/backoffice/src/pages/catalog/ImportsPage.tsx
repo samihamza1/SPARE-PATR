@@ -1,4 +1,10 @@
-import { IMPORT_FIELDS, IMPORT_MAX_FILE_BYTES, PART_NUMBER_KINDS, newId } from '@autoparts/shared';
+import {
+  IMPORT_FIELDS,
+  IMPORT_MAX_FILE_BYTES,
+  PART_NUMBER_KINDS,
+  importMappingSchema,
+  newId,
+} from '@autoparts/shared';
 import type {
   ImportBatch,
   ImportBatchDetail,
@@ -28,10 +34,11 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
-import { api } from '../../api';
+import { ApiRequestError, api } from '../../api';
 import { useCurrencies, usePriceLists } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useFormatDateTime } from '../../format';
+import { Form, useRequired } from '../../forms';
 
 /** Spreadsheet column letters: 0 -> A, 25 -> Z, 26 -> AA. */
 export function columnLetter(index: number): string {
@@ -127,16 +134,19 @@ export function ImportsPage() {
     },
   });
 
+  const required = useRequired({
+    numberKind,
+    ...(columns.sellPrice !== undefined && { priceListId }),
+    ...(columns.cost !== undefined && { costCurrency }),
+    ...(columns.sku === undefined && { skuPrefix }),
+  });
+  // The shared mapping rules (a column for the part's identity, one field per column), checked
+  // here so the user sees them before the file is sent again.
+  const [mappingError, setMappingError] = useState<ApiRequestError | null>(null);
+
   const stage = useMutation({
-    mutationFn: () => {
+    mutationFn: (mapping: ImportMapping) => {
       if (upload === null || sheetName === null) throw new Error('no file');
-      const mapping: ImportMapping = {
-        columns,
-        numberKind: numberKind as ImportMapping['numberKind'],
-        priceListId: columns.sellPrice === undefined ? null : priceListId,
-        costCurrency: columns.cost === undefined ? null : costCurrency,
-        skuPrefix: skuPrefix.trim() === '' ? null : skuPrefix.trim().toUpperCase(),
-      };
       return api<ImportBatchDetail>('POST', '/catalog/imports', {
         id: newId(),
         fileName: upload.fileName,
@@ -162,7 +172,10 @@ export function ImportsPage() {
   return (
     <Stack>
       <Title order={2}>{t('import.title')}</Title>
-      <Alert color="blue">{t('import.privacy')}</Alert>
+      {/* A standing notice, not an error: screen readers should not announce it as an alert. */}
+      <Alert color="blue" role="note">
+        {t('import.privacy')}
+      </Alert>
       <Stepper
         active={step}
         onStepClick={(s) => {
@@ -260,81 +273,101 @@ export function ImportsPage() {
         </Stepper.Step>
 
         <Stepper.Step label={t('import.steps.columns')}>
-          <Stack
-            mt="md"
-            component="form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              stage.mutate();
+          <Form
+            onSubmit={() => {
+              setMappingError(null);
+              if (!required.ok()) return;
+              const checked = importMappingSchema.safeParse({
+                columns,
+                numberKind,
+                priceListId: columns.sellPrice === undefined ? null : priceListId,
+                costCurrency: columns.cost === undefined ? null : costCurrency,
+                skuPrefix: skuPrefix.trim() === '' ? null : skuPrefix.trim().toUpperCase(),
+              });
+              if (checked.success) {
+                stage.mutate(checked.data);
+              } else {
+                const issues = checked.error.issues.map((i) => ({
+                  path: ['mapping', ...i.path].join('.'),
+                  message: i.message,
+                }));
+                setMappingError(new ApiRequestError(400, 'request.invalid', issues));
+              }
             }}
           >
-            <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              {IMPORT_FIELDS.map((field) => (
+            <Stack mt="md">
+              <SimpleGrid cols={{ base: 1, sm: 2 }}>
+                {IMPORT_FIELDS.map((field) => (
+                  <Select
+                    key={field}
+                    label={t(`import.field.${field}`)}
+                    placeholder={t('import.notMapped')}
+                    clearable
+                    value={columns[field] === undefined ? null : String(columns[field])}
+                    onChange={(v) => {
+                      const others = Object.fromEntries(
+                        Object.entries(columns).filter(([f]) => f !== field),
+                      );
+                      setColumns(v === null ? others : { ...others, [field]: Number(v) });
+                    }}
+                    data={columnOptions}
+                  />
+                ))}
+              </SimpleGrid>
+              <SimpleGrid cols={{ base: 1, sm: 2 }}>
                 <Select
-                  key={field}
-                  label={t(`import.field.${field}`)}
-                  placeholder={t('import.notMapped')}
-                  clearable
-                  value={columns[field] === undefined ? null : String(columns[field])}
-                  onChange={(v) => {
-                    const others = Object.fromEntries(
-                      Object.entries(columns).filter(([f]) => f !== field),
-                    );
-                    setColumns(v === null ? others : { ...others, [field]: Number(v) });
+                  label={t('import.numberKind')}
+                  required
+                  value={numberKind}
+                  onChange={setNumberKind}
+                  error={required.errors.numberKind}
+                  data={PART_NUMBER_KINDS.map((k) => ({
+                    value: k,
+                    label: t(`catalog.numberKind.${k}`),
+                  }))}
+                />
+                {columns.sellPrice !== undefined && (
+                  <Select
+                    label={t('import.priceList')}
+                    required
+                    value={priceListId}
+                    onChange={setPriceListId}
+                    error={required.errors.priceListId}
+                    data={(priceLists.data ?? [])
+                      .filter((l) => l.archivedAt === null)
+                      .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
+                  />
+                )}
+                {columns.cost !== undefined && (
+                  <Select
+                    label={t('import.costCurrency')}
+                    required
+                    value={costCurrency}
+                    onChange={setCostCurrency}
+                    error={required.errors.costCurrency}
+                    data={(currencies.data ?? []).map((c) => ({ value: c.code, label: c.code }))}
+                  />
+                )}
+                <TextInput
+                  label={t('import.skuPrefix')}
+                  description={t('import.skuPrefixHint')}
+                  required={columns.sku === undefined}
+                  dir="ltr"
+                  value={skuPrefix}
+                  error={required.errors.skuPrefix}
+                  onChange={(e) => {
+                    setSkuPrefix(e.currentTarget.value);
                   }}
-                  data={columnOptions}
                 />
-              ))}
-            </SimpleGrid>
-            <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              <Select
-                label={t('import.numberKind')}
-                required
-                value={numberKind}
-                onChange={setNumberKind}
-                data={PART_NUMBER_KINDS.map((k) => ({
-                  value: k,
-                  label: t(`catalog.numberKind.${k}`),
-                }))}
-              />
-              {columns.sellPrice !== undefined && (
-                <Select
-                  label={t('import.priceList')}
-                  required
-                  value={priceListId}
-                  onChange={setPriceListId}
-                  data={(priceLists.data ?? [])
-                    .filter((l) => l.archivedAt === null)
-                    .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
-                />
-              )}
-              {columns.cost !== undefined && (
-                <Select
-                  label={t('import.costCurrency')}
-                  required
-                  value={costCurrency}
-                  onChange={setCostCurrency}
-                  data={(currencies.data ?? []).map((c) => ({ value: c.code, label: c.code }))}
-                />
-              )}
-              <TextInput
-                label={t('import.skuPrefix')}
-                description={t('import.skuPrefixHint')}
-                required={columns.sku === undefined}
-                dir="ltr"
-                value={skuPrefix}
-                onChange={(e) => {
-                  setSkuPrefix(e.currentTarget.value);
-                }}
-              />
-            </SimpleGrid>
-            <ErrorAlert error={stage.error} />
-            <Group>
-              <Button type="submit" loading={stage.isPending} disabled={numberKind === null}>
-                {t('import.stage')}
-              </Button>
-            </Group>
-          </Stack>
+              </SimpleGrid>
+              <ErrorAlert error={mappingError ?? stage.error} />
+              <Group>
+                <Button type="submit" loading={stage.isPending}>
+                  {t('import.stage')}
+                </Button>
+              </Group>
+            </Stack>
+          </Form>
         </Stepper.Step>
       </Stepper>
       <History />

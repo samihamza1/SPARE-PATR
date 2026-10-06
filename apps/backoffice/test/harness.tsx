@@ -7,7 +7,8 @@ import type {
   Role,
   User,
 } from '@autoparts/shared';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 import { App } from '../src/App';
@@ -216,6 +217,17 @@ export function onPartPage(api: FakeApi, detail: PartDetail): FakeApi {
     .on('GET /catalog/brands', ok([]))
     .on('GET /catalog/categories', ok([]))
     .on('GET /catalog/price-lists', ok([]));
+}
+
+/** A field's label as a regex: required fields add " *" to the label. */
+export const labelled = (label: string) =>
+  new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`);
+
+/** Opens a Mantine Select by its label and picks an option, as a user would. */
+export async function pick(label: string, option: string, scope: HTMLElement = document.body) {
+  const user = userEvent.setup();
+  await user.click(within(scope).getByLabelText(labelled(label), { selector: 'input' }));
+  await user.click(await screen.findByRole('option', { name: option }));
 }
 
 /** Fills the sign-in form and submits it. */
