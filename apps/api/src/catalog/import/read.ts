@@ -1,9 +1,16 @@
-import { Decimal, IMPORT_MAX_COLUMNS, IMPORT_MAX_ROWS, toDecimalString } from '@autoparts/shared';
+import {
+  Decimal,
+  IMPORT_MAX_COLUMNS,
+  IMPORT_MAX_ROWS,
+  IMPORT_MAX_SHEET_NAME,
+  toDecimalString,
+} from '@autoparts/shared';
 import type { ImportCell } from '@autoparts/shared';
 import { unzipSync } from 'fflate';
 import readExcelFile, { SheetNotFoundError, readSheet } from 'read-excel-file/node';
 import { ApiError } from '../../errors';
 import { parseCsv } from './csv';
+import { SheetTooLargeError } from './limits';
 
 export interface WorkbookSheet {
   name: string;
@@ -121,7 +128,22 @@ export async function readWorkbook(
   } catch {
     throw unreadable();
   }
-  const name = fileName.replace(/\.csv$/i, '');
+  const name = csvSheetName(fileName);
   if (only !== undefined && only !== name) throw new ApiError(400, 'import.sheet_not_found');
-  return [{ name, rows: toRows(parseCsv(text)) }];
+  try {
+    return [{ name, rows: toRows(parseCsv(text)) }];
+  } catch (err) {
+    if (err instanceof SheetTooLargeError) throw new ApiError(400, 'import.too_many_rows');
+    throw err;
+  }
+}
+
+/** The file name without .csv, cut to the longest sheet name a batch keeps. */
+function csvSheetName(fileName: string): string {
+  const name = fileName.replace(/\.csv$/i, '');
+  if (name.length <= IMPORT_MAX_SHEET_NAME) return name;
+  // Never cut between the two halves of a surrogate pair.
+  const last = name.charCodeAt(IMPORT_MAX_SHEET_NAME - 1);
+  const end = last >= 0xd800 && last <= 0xdbff ? IMPORT_MAX_SHEET_NAME - 1 : IMPORT_MAX_SHEET_NAME;
+  return name.slice(0, end);
 }

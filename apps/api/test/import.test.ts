@@ -1,6 +1,13 @@
+import {
+  IMPORT_MAX_COLUMNS,
+  IMPORT_MAX_FILE_BYTES,
+  IMPORT_MAX_SHEET_NAME,
+  createImportSchema,
+} from '@autoparts/shared';
 import type { ImportMapping } from '@autoparts/shared';
 import { describe, expect, it } from 'vitest';
 import { parseCsv } from '../src/catalog/import/csv';
+import { SHEET_MAX_ROWS, SheetTooLargeError } from '../src/catalog/import/limits';
 import type { AnalysisInput } from '../src/catalog/import/parse';
 import { analyseRows, extractRaw, parseRow } from '../src/catalog/import/parse';
 import { cleanNumericText, readWorkbook } from '../src/catalog/import/read';
@@ -8,6 +15,41 @@ import { ApiError } from '../src/errors';
 import { buildXlsx } from './xlsx';
 
 const PRICE = { minorUnits: 2, roundingMode: 'HALF_EVEN' as const };
+
+const errorCodeOf = (p: Promise<unknown>) =>
+  p.then(
+    () => 'ok',
+    (e: unknown) => (e instanceof ApiError ? e.code : 'other'),
+  );
+
+describe('reading limits (crafted files)', () => {
+  const LIMITS = { maxRows: SHEET_MAX_ROWS, maxColumns: IMPORT_MAX_COLUMNS };
+
+  it('stops a CSV at the row limit: 10 MB of newlines is refused fast', async () => {
+    const newlines = '\n'.repeat(IMPORT_MAX_FILE_BYTES);
+    const started = performance.now();
+    expect(() => parseCsv(newlines, LIMITS)).toThrow(SheetTooLargeError);
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(await errorCodeOf(readWorkbook(Buffer.from(newlines), 'blank.csv', 'blank'))).toBe(
+      'import.too_many_rows',
+    );
+    // Exactly at the limit is fine.
+    expect(parseCsv('a\n'.repeat(SHEET_MAX_ROWS), LIMITS)).toHaveLength(SHEET_MAX_ROWS);
+  });
+
+  it('bounds CSV columns: empty fields past the limit are dropped, values refused', () => {
+    const wide = `${'a,'.repeat(IMPORT_MAX_COLUMNS)},,,\n`;
+    expect(parseCsv(wide, LIMITS)[0]).toHaveLength(IMPORT_MAX_COLUMNS);
+    expect(() => parseCsv(`${'a,'.repeat(IMPORT_MAX_COLUMNS)}b\n`, LIMITS)).toThrow(
+      SheetTooLargeError,
+    );
+    // A 10 MB single row of separators stays one short row.
+    const commas = ','.repeat(IMPORT_MAX_FILE_BYTES);
+    const started = performance.now();
+    expect(parseCsv(commas, LIMITS)[0]).toHaveLength(IMPORT_MAX_COLUMNS);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+});
 
 describe('reading files', () => {
   it('reads every sheet of an xlsx, numbers as exact text cut to Excel precision', async () => {
@@ -68,6 +110,21 @@ describe('reading files', () => {
         ['123', 'فلتر'],
       ],
     });
+  });
+
+  it('names a CSV sheet after the file, cut to the longest sheet name a batch accepts', async () => {
+    const long = `${'x'.repeat(150)}.csv`;
+    const [sheet] = await readWorkbook(Buffer.from('a,b\n'), long);
+    expect(sheet?.name).toBe('x'.repeat(IMPORT_MAX_SHEET_NAME));
+    // Staging sends the name back; it must be accepted, and match the file again.
+    expect(createImportSchema.shape.sheet.safeParse(sheet?.name).success).toBe(true);
+    expect((await readWorkbook(Buffer.from('a,b\n'), long, sheet?.name))[0]?.rows).toEqual([
+      ['a', 'b'],
+    ]);
+    // Never cut between the two halves of a character outside the BMP.
+    const emoji = `${'x'.repeat(IMPORT_MAX_SHEET_NAME - 1)}🚗 parts.csv`;
+    const [cut] = await readWorkbook(Buffer.from('a\n'), emoji);
+    expect(cut?.name).toBe('x'.repeat(IMPORT_MAX_SHEET_NAME - 1));
   });
 
   it('keeps non-numeric text from numeric cleaning', () => {
