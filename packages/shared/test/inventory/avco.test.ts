@@ -39,7 +39,7 @@ describe('receiving and issuing with stock on hand', () => {
   });
 });
 
-describe('negative stock (accepted offline sales, ADR 0019)', () => {
+describe('negative stock (accepted offline sales, ADR 0020)', () => {
   it('issues beyond zero at the last positive average', () => {
     const r = issueCost(state(1, '10.00', [1, '10.00']), 3, ctx);
     expect(r).toEqual({ state: state(-2, '-20.00', [1, '10.00']), cost: '30.00', costKnown: true });

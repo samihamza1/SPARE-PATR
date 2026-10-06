@@ -10,7 +10,7 @@ import { currencyCodeSchema, decimalStringSchema } from './schemas';
 /**
  * A market quote, stored as entered: 1 unit of `base` = `rate` units of `quote`
  * (e.g. 1 USD = 3.6725 AED). Converting from the quote currency divides exactly, so an
- * inverse rate is never rounded and stored (ADR 0018).
+ * inverse rate is never rounded and stored (ADR 0019).
  */
 export interface FxQuote {
   readonly base: string;
