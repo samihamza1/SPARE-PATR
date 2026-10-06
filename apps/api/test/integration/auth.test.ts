@@ -1,6 +1,7 @@
 import { withTenant } from '@autoparts/db';
 import type { MeResponse } from '@autoparts/shared';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { fastifyTrustProxy } from '../../src/config';
 import { buildServer } from '../../src/server';
 import type { Shop } from './harness';
 import {
@@ -221,5 +222,37 @@ describe('per-IP credential throttle', () => {
     });
     expect(enroll.statusCode).toBe(429);
     await app.close();
+  });
+});
+
+describe('client address', () => {
+  it('signs in even when a misconfigured proxy hop count yields a non-IP client address', async () => {
+    // Two trusted hops behind one real proxy: the client's own X-Forwarded-For entry wins.
+    const app = buildServer(
+      {
+        checkDatabase: () => Promise.resolve(),
+        platform: {
+          db: env.appDb,
+          allowedOrigins: [],
+          cookieSecure: true,
+          now: () => env.clock.now,
+          ipAttemptsPerMinute: 10_000,
+        },
+      },
+      { trustProxy: fastifyTrustProxy(2) },
+    );
+    const s = await provisionShop(env);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: { 'x-forwarded-for': 'not-an-ip, 198.51.100.7' },
+      payload: { tenant: s.slug, username: 'owner', password: OWNER_PASSWORD },
+    });
+    await app.close();
+    expect(res.statusCode).toBe(200);
+    const sessions = await withTenant(env.ownerDb, s.tenantId, (trx) =>
+      trx.selectFrom('sessions').select('ip').execute(),
+    );
+    expect(sessions).toEqual([{ ip: null }]);
   });
 });

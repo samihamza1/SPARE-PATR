@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { tenantSettingsSchema, toPermissions, uuidSchema } from '@autoparts/shared';
 import type { DB } from '@autoparts/db';
 import { withTenant } from '@autoparts/db';
@@ -71,7 +72,8 @@ export async function createSession(
       created_at: input.now,
       last_seen_at: input.now,
       expires_at: expiresAt,
-      ip: input.ip,
+      // sessions.ip is inet; behind a misconfigured proxy request.ip can be any string.
+      ip: input.ip !== null && isIP(input.ip) !== 0 ? input.ip : null,
       user_agent: input.userAgent?.slice(0, 512) ?? null,
     })
     .execute();
