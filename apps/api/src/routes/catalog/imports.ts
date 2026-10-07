@@ -9,6 +9,7 @@ import {
 } from '@autoparts/shared';
 import type {
   ImportIssue,
+  ImportMapping,
   ImportRow,
   InspectImportResult,
   ParsedImportRow,
@@ -17,8 +18,10 @@ import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { audit } from '../../audit';
+import type { AuthContext } from '../../auth/context';
+import { authOf } from '../../auth/plugin';
 import type { PlatformDeps } from '../../auth/plugin';
-import { ApiError } from '../../errors';
+import { ApiError, forbidden } from '../../errors';
 import { inspectWorkbook, readWorkbook } from '../../catalog/import/read';
 import {
   analyseBatch,
@@ -36,6 +39,16 @@ const IMPORT = 'catalog.import' as const;
 /** base64 of the largest file plus the JSON around it. */
 const UPLOAD_BODY_LIMIT = Math.ceil(IMPORT_MAX_FILE_BYTES / 3) * 4 + 64 * 1024;
 const SAMPLE_ROWS = 30;
+
+/** Mapping a price column sets selling prices, which needs prices.manage like a manual change. */
+function assertMaySetPrices(
+  auth: AuthContext,
+  mapping: Pick<ImportMapping, 'columns'> | null,
+): void {
+  if (mapping?.columns.sellPrice !== undefined && !auth.permissions.has('prices.manage')) {
+    throw forbidden();
+  }
+}
 
 function decode(contentBase64: string): Buffer {
   const bytes = Buffer.from(contentBase64, 'base64');
@@ -76,6 +89,7 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     },
     async (request, reply) => {
       const b = request.body;
+      assertMaySetPrices(authOf(request), b.mapping);
       const bytes = decode(b.contentBase64);
       const [sheet] = await readWorkbook(bytes, b.fileName, b.sheet);
       const detail = await inTenant(deps, request, async (trx, auth) => {
@@ -127,7 +141,8 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     },
     (request) =>
       inTenant(deps, request, async (trx, auth): Promise<ImportRow[]> => {
-        await loadBatchDetail(trx, request.params.id);
+        // A discarded batch's cells were blanked; it has no rows to show.
+        if ((await loadBatchDetail(trx, request.params.id)).status === 'discarded') return [];
         const f = request.query;
         let q = trx
           .selectFrom('import_rows')
@@ -179,7 +194,8 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     '/catalog/imports/:id/analyse',
     { schema: { params: idParamsSchema }, config: { access: IMPORT } },
     (request) =>
-      inTenant(deps, request, async (trx) => {
+      inTenant(deps, request, async (trx, auth) => {
+        assertMaySetPrices(auth, (await loadBatchDetail(trx, request.params.id)).mapping);
         await analyseBatch(trx, request.params.id, true);
         await markPreviewed(trx, request.params.id);
         return loadBatchDetail(trx, request.params.id);
@@ -192,7 +208,8 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     (request) =>
       inTenant(deps, request, async (trx, auth) => {
         const at = now();
-        const stats = await applyBatch(trx, auth, request.params.id, at);
+        assertMaySetPrices(auth, (await loadBatchDetail(trx, request.params.id)).mapping);
+        const stats = await applyBatch(trx, actorOf(request), request.params.id, at);
         const detail = await loadBatchDetail(trx, request.params.id);
         await audit(
           trx,
