@@ -1,6 +1,8 @@
 import {
   IMPORT_FIELDS,
+  IMPORT_MAX_COLUMNS,
   IMPORT_MAX_FILE_BYTES,
+  IMPORT_MAX_ROWS,
   PART_NUMBER_KINDS,
   importMappingSchema,
   newId,
@@ -20,6 +22,7 @@ import {
   Card,
   FileInput,
   Group,
+  NumberInput,
   ScrollArea,
   Select,
   SimpleGrid,
@@ -31,10 +34,11 @@ import {
   Title,
 } from '@mantine/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { ApiRequestError, api } from '../../api';
+import { useAuth } from '../../auth';
 import { useCurrencies, usePriceLists } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useFormatDateTime } from '../../format';
@@ -111,6 +115,8 @@ export function maxFileSize(language: string): string {
 
 export function ImportsPage() {
   const { t, i18n } = useTranslation();
+  const { can } = useAuth();
+  const hintId = useId();
   const navigate = useNavigate();
   const priceLists = usePriceLists();
   const currencies = useCurrencies();
@@ -136,7 +142,8 @@ export function ImportsPage() {
     },
     onSuccess: (u) => {
       setUpload(u);
-      setSheetName(u.result.sheets[0]?.name ?? null);
+      // Sheets past the size limits are listed but cannot be chosen.
+      setSheetName(u.result.sheets.find((s) => !s.tooLarge)?.name ?? null);
       setHeaderRow(1);
       setColumns({});
       setStep(1);
@@ -172,10 +179,23 @@ export function ImportsPage() {
 
   const sheet = upload?.result.sheets.find((s) => s.name === sheetName);
   const header = sheet?.rows[headerRow - 1] ?? [];
-  const columnOptions = Array.from({ length: sheet?.columnCount ?? 0 }, (_, i) => ({
-    value: String(i),
-    label: `${columnLetter(i)} — ${header[i] ?? ''}`,
-  }));
+  const columnOptions = Array.from({ length: sheet?.columnCount ?? 0 }, (_, i) => {
+    const title = header[i] ?? '';
+    return {
+      value: String(i),
+      label:
+        title === ''
+          ? columnLetter(i)
+          : t('import.columnOption', { letter: columnLetter(i), title }),
+    };
+  });
+  const limits = { rows: IMPORT_MAX_ROWS, columns: IMPORT_MAX_COLUMNS };
+  const pickHeader = (row: number) => {
+    setHeaderRow(row);
+    setColumns({});
+  };
+  // Selling prices are set only by users who may change prices (prices.manage).
+  const fields = IMPORT_FIELDS.filter((f) => f !== 'sellPrice' || can('prices.manage'));
   const tooLarge = file !== null && file.size > IMPORT_MAX_FILE_BYTES;
 
   return (
@@ -221,17 +241,42 @@ export function ImportsPage() {
             <Select
               label={t('import.sheet')}
               value={sheetName}
+              allowDeselect={false}
               onChange={(v) => {
                 setSheetName(v);
-                setHeaderRow(1);
-                setColumns({});
+                pickHeader(1);
               }}
               data={(upload?.result.sheets ?? []).map((s) => ({
                 value: s.name,
-                label: `${s.name} (${t('import.rows', { count: s.rowCount })})`,
+                label: s.tooLarge
+                  ? t('import.sheetTooLarge', { name: s.name, ...limits })
+                  : t('import.sheetOption', {
+                      name: s.name,
+                      rows: t('import.rows', { count: s.rowCount }),
+                    }),
+                disabled: s.tooLarge,
               }))}
             />
-            <Text size="sm">{t('import.headerHint')}</Text>
+            {upload !== null && sheet === undefined && (
+              <Alert color="red">{t('import.noReadableSheet', limits)}</Alert>
+            )}
+            <Text size="sm" id={hintId}>
+              {t('import.headerHint')}
+            </Text>
+            <NumberInput
+              label={t('import.headerRow')}
+              aria-describedby={hintId}
+              min={1}
+              max={Math.max(1, sheet?.rows.length ?? 1)}
+              allowDecimal={false}
+              allowNegative={false}
+              clampBehavior="strict"
+              value={headerRow}
+              onChange={(v) => {
+                if (typeof v === 'number' && v >= 1) pickHeader(v);
+              }}
+              w={160}
+            />
             <ScrollArea h={360}>
               <Table withTableBorder highlightOnHover dir="ltr" fz="xs">
                 <Table.Thead>
@@ -255,8 +300,7 @@ export function ImportsPage() {
                       }}
                       aria-selected={r + 1 === headerRow}
                       onClick={() => {
-                        setHeaderRow(r + 1);
-                        setColumns({});
+                        pickHeader(r + 1);
                       }}
                     >
                       <Table.Td>{r + 1}</Table.Td>
@@ -269,10 +313,8 @@ export function ImportsPage() {
               </Table>
             </ScrollArea>
             <Group>
-              <Text>
-                {t('import.headerRow')}: {headerRow}
-              </Text>
               <Button
+                disabled={sheet === undefined}
                 onClick={() => {
                   setStep(2);
                 }}
@@ -308,7 +350,7 @@ export function ImportsPage() {
           >
             <Stack mt="md">
               <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                {IMPORT_FIELDS.map((field) => (
+                {fields.map((field) => (
                   <Select
                     key={field}
                     label={t(`import.field.${field}`)}
@@ -346,7 +388,10 @@ export function ImportsPage() {
                     error={required.errors.priceListId}
                     data={(priceLists.data ?? [])
                       .filter((l) => l.archivedAt === null)
-                      .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
+                      .map((l) => ({
+                        value: l.id,
+                        label: t('catalog.priceListOption', { name: l.name, currency: l.currency }),
+                      }))}
                   />
                 )}
                 {columns.cost !== undefined && (

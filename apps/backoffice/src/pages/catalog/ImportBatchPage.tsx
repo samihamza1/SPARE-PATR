@@ -23,9 +23,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
-import { api } from '../../api';
+import { ApiRequestError, api } from '../../api';
 import { useAuth } from '../../auth';
-import { VehiclePicker, catalogKeys, categoryName, useCategories } from '../../catalog/common';
+import {
+  RemovableBadge,
+  VehiclePicker,
+  catalogKeys,
+  categoryName,
+  useCategories,
+} from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
 type Code = ImportBatchDetail['vehicleCodes'][number];
@@ -60,13 +66,24 @@ function MapCode({
   const categories = useCategories();
   const [target, setTarget] = useState<string | null>('vehicle');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  // Vehicles whose alias is already saved: a retry after a partial failure skips them.
+  const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const save = useMutation({
     mutationFn: async () => {
       const post = (body: object) =>
         api('POST', '/catalog/vehicle-aliases', { id: newId(), alias: code.code, target, ...body });
       if (target === 'vehicle') {
-        for (const v of vehicles) await post({ vehicleId: v.id });
+        for (const v of vehicles) {
+          if (saved.has(v.id)) continue;
+          try {
+            await post({ vehicleId: v.id });
+          } catch (err) {
+            // The code already means this vehicle (an earlier attempt whose answer was lost).
+            if (!(err instanceof ApiRequestError && err.code === 'resource.conflict')) throw err;
+          }
+          setSaved((s) => new Set(s).add(v.id));
+        }
       } else if (target === 'category') {
         await post({ categoryId });
       } else {
@@ -75,16 +92,23 @@ function MapCode({
     },
     onSuccess: onSaved,
   });
+  const savedVehicles = vehicles.filter((v) => saved.has(v.id));
   const ready =
     (target === 'vehicle' && vehicles.length > 0) ||
     (target === 'category' && categoryId !== null) ||
     target === 'ignore';
   return (
-    <Modal opened onClose={onClose} title={`${t('import.mapCode')}: ${code.code}`}>
+    <Modal
+      opened
+      // Some vehicles were saved before a failure: the preview must count them.
+      onClose={saved.size > 0 ? onSaved : onClose}
+      title={t('import.mapCodeTitle', { code: code.code })}
+    >
       <Stack>
         <Select
           label={t('import.mapping')}
           value={target}
+          disabled={saved.size > 0}
           onChange={setTarget}
           data={(['vehicle', 'category', 'ignore'] as const).map((x) => ({
             value: x,
@@ -94,18 +118,31 @@ function MapCode({
         {target === 'vehicle' && (
           <>
             <Group gap="xs">
-              {vehicles.map((v) => (
-                <Badge
-                  key={v.id}
-                  variant="light"
-                  onClick={() => {
-                    setVehicles(vehicles.filter((x) => x.id !== v.id));
-                  }}
-                >
-                  {v.name} ×
-                </Badge>
-              ))}
+              {vehicles.map((v) =>
+                saved.has(v.id) ? (
+                  <Badge key={v.id} variant="light" color="green">
+                    {v.name}
+                  </Badge>
+                ) : (
+                  <RemovableBadge
+                    key={v.id}
+                    label={v.name}
+                    onRemove={() => {
+                      setVehicles(vehicles.filter((x) => x.id !== v.id));
+                    }}
+                  />
+                ),
+              )}
             </Group>
+            {savedVehicles.length > 0 && (
+              <Text size="sm" c="dimmed">
+                {t('import.mapSaved', {
+                  names: new Intl.ListFormat(i18n.language).format(
+                    savedVehicles.map((v) => v.name),
+                  ),
+                })}
+              </Text>
+            )}
             <VehiclePicker
               onPick={(v) => {
                 if (!vehicles.some((x) => x.id === v.id)) setVehicles([...vehicles, v]);
@@ -266,8 +303,10 @@ export function ImportBatchPage() {
         {b.status === 'applied' && (
           <Group mt="sm">
             <Text>
-              {t('import.pricesSet')}: {b.stats?.pricesSet ?? 0} · {t('import.fitmentsAdded')}:{' '}
-              {b.stats?.fitmentsAdded ?? 0}
+              {t('import.appliedSummary', {
+                prices: b.stats?.pricesSet ?? 0,
+                fitments: b.stats?.fitmentsAdded ?? 0,
+              })}
             </Text>
             <Anchor component={Link} to="/catalog/parts">
               {t('import.openParts')}
