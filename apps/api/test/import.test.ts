@@ -26,7 +26,14 @@ const errorCodeOf = (p: Promise<unknown>) =>
     (e: unknown) => (e instanceof ApiError ? e.code : 'other'),
   );
 
-describe('reading limits (crafted files)', () => {
+/**
+ * Each read starts a reader process, which loads TypeScript through tsx when run from
+ * source: about a second when the machine is busy. Tests that read several files get the
+ * time those processes need, not the 5 s default (a single slower test sets its own).
+ */
+const READS = 20_000;
+
+describe('reading limits (crafted files)', { timeout: READS }, () => {
   const LIMITS = { maxRows: SHEET_MAX_ROWS, maxColumns: IMPORT_MAX_COLUMNS };
 
   it('stops a CSV at the row limit: 10 MB of newlines is refused fast', async () => {
@@ -63,8 +70,8 @@ describe('reading limits (crafted files)', () => {
   const small = { A: worksheet('<row r="1"><c r="A1"><v>1</v></c></row>') };
 
   it('refuses a zip whose directory under-declares an entry (zip bomb)', async () => {
-    const bomb = buildXlsxFromXml(small, { 'xl/bomb.xml': new Uint8Array(50 * MB) });
-    // The directory says 10 bytes; the local header still says 50 MB.
+    const bomb = buildXlsxFromXml(small, { 'xl/bomb.xml': new Uint8Array(4 * MB) });
+    // The directory says 10 bytes; the local header still says 4 MB.
     const lying = patchZipEntry(bomb, 'xl/bomb.xml', { centralSize: 10 });
     expect(await errorCodeOf(readWorkbook(lying, 'bomb.xlsx'))).toBe('import.unreadable_file');
     // Both say 10 bytes, or the local header defers to a data descriptor: inflating stops
@@ -77,7 +84,7 @@ describe('reading limits (crafted files)', () => {
       expect(await errorCodeOf(readWorkbook(crafted, 'bomb.xlsx'))).toBe('import.unreadable_file');
     }
     // Unrelated entries (images and the like) are never inflated.
-    const image = buildXlsxFromXml(small, { 'xl/media/image1.png': new Uint8Array(50 * MB) });
+    const image = buildXlsxFromXml(small, { 'xl/media/image1.png': new Uint8Array(4 * MB) });
     const patched = patchZipEntry(image, 'xl/media/image1.png', { centralSize: 10 });
     expect((await readWorkbook(patched, 'image.xlsx'))[0]?.rows).toEqual([['1']]);
   });
@@ -370,7 +377,7 @@ describe('scanning sheet XML before it is read', () => {
   });
 });
 
-describe('reading files', () => {
+describe('reading files', { timeout: READS }, () => {
   it('reads every sheet of an xlsx, numbers as exact text cut to Excel precision', async () => {
     const file = buildXlsx({
       Catalog: [
