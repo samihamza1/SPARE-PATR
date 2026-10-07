@@ -151,6 +151,16 @@
       "mapping_needs_cost_currency": "Choose the currency of the cost column",
       "mapping_needs_sku": "Map a SKU column or enter a SKU prefix",
       "mapping_duplicate_column": "One column is mapped to more than one field"
+    },
+    "update": {
+      "nothing_to_set": "Nothing to change"
+    },
+    "decimal": {
+      "invalid": "Enter a number such as 0.25"
+    },
+    "currency": {
+      "cash_increment_positive": "The cash increment must be greater than zero",
+      "cash_increment_scale": "The cash increment has more decimals than the currency"
     }
   },
   "errors": {
@@ -183,7 +193,10 @@
       "already_applied": "This sheet of this file was already imported",
       "not_editable": "This import was already applied or discarded"
     },
-    "server": { "error": "Something went wrong" }
+    "server": { "error": "Something went wrong" },
+    "catalog": {
+      "archived": "It is archived; restore it first"
+    }
   },
   "permissions": {
     "users": { "manage": "Manage users" },
@@ -337,7 +350,8 @@
         "create": "Part created",
         "update": "Part updated",
         "bulk_update": "Parts updated together",
-        "supersede": "Part replaced"
+        "supersede": "Part replaced",
+        "supersede_remove": "Replacement removed"
       },
       "part_number": {
         "add": "Part number added",
@@ -396,7 +410,8 @@
     "matchedBy": {
       "number": "Part number",
       "text": "Name",
-      "vehicle": "Vehicle"
+      "vehicle": "Vehicle",
+      "replacement": "Replaces the number searched"
     },
     "alternatives": "Alternatives",
     "noAlternatives": "No alternatives",
@@ -504,7 +519,10 @@
     "pathSeparator": "›",
     "vehiclePath": "Vehicle path",
     "archiveConfirm": "Archive this part? It disappears from lists and sales search until it is restored.",
-    "showArchived": "Show archived parts"
+    "showArchived": "Show archived parts",
+    "removeSupersession": "Remove replacement",
+    "removeCopiedFitments": "Also remove the vehicles copied to the new part",
+    "removeSupersessionConfirm": "Remove the replacement by {{sku}}?"
   },
   "vehicles": {
     "title": "Vehicles",

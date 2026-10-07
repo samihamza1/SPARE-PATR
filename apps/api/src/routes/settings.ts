@@ -1,7 +1,9 @@
 import {
   createCurrencySchema,
+  dec,
   idParamsSchema,
   tenantSettingsSchema,
+  toDecimalString,
   updateCurrencySchema,
   updateSettingsSchema,
 } from '@autoparts/shared';
@@ -10,7 +12,7 @@ import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import type { FastifyInstance } from 'fastify';
 import { audit } from '../audit';
 import type { PlatformDeps } from '../auth/plugin';
-import { notFound } from '../errors';
+import { ApiError, notFound } from '../errors';
 import type { Trx } from './common';
 import { actorOf, inTenant } from './common';
 
@@ -49,6 +51,21 @@ async function loadCurrencies(trx: Trx, id?: string): Promise<Currency[]> {
     sortOrder: c.sort_order,
     isFunctional: c.code === functional_currency,
   }));
+}
+
+/**
+ * Stores a cash increment as its plain value ("0.050" is 0.05), and refuses one finer than
+ * the currency's minor units with a field-level issue instead of a database error.
+ */
+function cashIncrementFor(value: string | null, minorUnits: number): string | null {
+  if (value === null) return null;
+  const increment = dec(value);
+  if (increment.decimalPlaces() > minorUnits) {
+    throw new ApiError(400, 'request.invalid', [
+      { path: 'cashIncrement', message: 'currency.cash_increment_scale' },
+    ]);
+  }
+  return toDecimalString(increment);
 }
 
 export function settingsRoutes(app: FastifyInstance, deps: PlatformDeps): void {
@@ -99,6 +116,7 @@ export function settingsRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     async (request, reply) => {
       const currency = await inTenant(deps, request, async (trx, auth) => {
         const b = request.body;
+        const cashIncrement = cashIncrementFor(b.cashIncrement ?? null, b.minorUnits);
         await trx
           .insertInto('tenant_currencies')
           .values({
@@ -106,7 +124,7 @@ export function settingsRoutes(app: FastifyInstance, deps: PlatformDeps): void {
             tenant_id: auth.tenantId,
             code: b.code,
             minor_units: b.minorUnits,
-            cash_increment: b.cashIncrement ?? null,
+            cash_increment: cashIncrement,
             ...(b.sortOrder !== undefined && { sort_order: b.sortOrder }),
           })
           .execute();
@@ -135,7 +153,9 @@ export function settingsRoutes(app: FastifyInstance, deps: PlatformDeps): void {
         await trx
           .updateTable('tenant_currencies')
           .set({
-            ...(b.cashIncrement !== undefined && { cash_increment: b.cashIncrement }),
+            ...(b.cashIncrement !== undefined && {
+              cash_increment: cashIncrementFor(b.cashIncrement, before.minorUnits),
+            }),
             ...(b.isActive !== undefined && { is_active: b.isActive }),
             ...(b.sortOrder !== undefined && { sort_order: b.sortOrder }),
           })

@@ -31,7 +31,9 @@ export function buildServer(deps: ServerDeps, options: FastifyServerOptions = {}
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {
-      return reply.code(error.statusCode).send({ error: { code: error.code } });
+      return reply.code(error.statusCode).send({
+        error: { code: error.code, ...(error.issues !== undefined && { issues: error.issues }) },
+      });
     }
     if (hasZodFastifySchemaValidationErrors(error)) {
       const issues = error.validation.map((v) => ({

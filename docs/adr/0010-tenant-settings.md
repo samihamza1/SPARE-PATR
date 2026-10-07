@@ -40,3 +40,9 @@ get a silent default.
 - New modules add their settings to the schema; a new required field needs a data
   migration or a setup step for existing tenants.
 - The database does not validate the jsonb shape; only the API writes it.
+
+## Addendum (2026-10-07, Sprints 1–3 review)
+
+- A cash increment must be above zero. It is stored as its value ("0.050" is 0.05).
+- An increment finer than the currency's minor units is refused with a field-level issue
+  (`currency.cash_increment_scale`) instead of a bare database error.

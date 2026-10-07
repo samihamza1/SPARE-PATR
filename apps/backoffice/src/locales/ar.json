@@ -151,6 +151,16 @@
       "mapping_needs_cost_currency": "اختر عملة عمود التكلفة",
       "mapping_needs_sku": "اربط عمود رمز الصنف أو أدخل بادئة رمز الصنف",
       "mapping_duplicate_column": "عمود واحد مربوط بأكثر من حقل"
+    },
+    "update": {
+      "nothing_to_set": "لا يوجد ما يُغيَّر"
+    },
+    "decimal": {
+      "invalid": "أدخل رقماً مثل 0.25"
+    },
+    "currency": {
+      "cash_increment_positive": "يجب أن تكون فئة النقد أكبر من صفر",
+      "cash_increment_scale": "فئة النقد فيها خانات عشرية أكثر من العملة"
     }
   },
   "errors": {
@@ -183,7 +193,10 @@
       "already_applied": "سبق استيراد هذه الورقة من هذا الملف",
       "not_editable": "هذا الاستيراد طُبِّق أو أُلغي من قبل"
     },
-    "server": { "error": "حدث خطأ غير متوقع" }
+    "server": { "error": "حدث خطأ غير متوقع" },
+    "catalog": {
+      "archived": "العنصر مؤرشف؛ استعده أولاً"
+    }
   },
   "permissions": {
     "users": { "manage": "إدارة المستخدمين" },
@@ -337,7 +350,8 @@
         "create": "إنشاء قطعة",
         "update": "تعديل قطعة",
         "bulk_update": "تعديل جماعي للقطع",
-        "supersede": "إحلال قطعة"
+        "supersede": "إحلال قطعة",
+        "supersede_remove": "أُزيل البديل"
       },
       "part_number": {
         "add": "إضافة رقم قطعة",
@@ -396,7 +410,8 @@
     "matchedBy": {
       "number": "رقم القطعة",
       "text": "الاسم",
-      "vehicle": "السيارة"
+      "vehicle": "السيارة",
+      "replacement": "بديل للرقم المطلوب"
     },
     "alternatives": "البدائل",
     "noAlternatives": "لا بدائل",
@@ -504,7 +519,10 @@
     "pathSeparator": "›",
     "vehiclePath": "تسلسل السيارة",
     "archiveConfirm": "أرشفة هذه القطعة؟ ستختفي من القوائم ومن بحث البيع حتى تُستعاد.",
-    "showArchived": "عرض القطع المؤرشفة"
+    "showArchived": "عرض القطع المؤرشفة",
+    "removeSupersession": "إزالة البديل",
+    "removeCopiedFitments": "إزالة السيارات التي نُسخت إلى القطعة الجديدة أيضاً",
+    "removeSupersessionConfirm": "إزالة البديل {{sku}}؟"
   },
   "vehicles": {
     "title": "السيارات",

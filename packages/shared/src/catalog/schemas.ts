@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { uuidSchema, uuidV7Schema } from '../ids';
 import { currencyCodeSchema, decimalStringSchema } from '../money';
+import { requireChange } from '../patch';
 
 /** BRIEF quality grades, best first. `null` on a part means "not graded yet". */
 export const QUALITY_GRADES = ['oem', 'premium', 'good', 'economy'] as const;
@@ -32,9 +33,9 @@ export const createBrandSchema = z.object({
   name: shortNameSchema,
   kind: z.enum(BRAND_KINDS),
 });
-export const updateBrandSchema = z
-  .object({ name: shortNameSchema, kind: z.enum(BRAND_KINDS), archived: z.boolean() })
-  .partial();
+export const updateBrandSchema = requireChange(
+  z.object({ name: shortNameSchema, kind: z.enum(BRAND_KINDS), archived: z.boolean() }).partial(),
+);
 
 export const categorySchema = z.object({
   id: uuidSchema,
@@ -54,9 +55,9 @@ export const createCategorySchema = z
     message: 'name.required',
     path: ['nameAr'],
   });
-export const updateCategorySchema = z
-  .object({ ...categoryNames, parentId: uuidSchema.nullable(), archived: z.boolean() })
-  .partial();
+export const updateCategorySchema = requireChange(
+  z.object({ ...categoryNames, parentId: uuidSchema.nullable(), archived: z.boolean() }).partial(),
+);
 
 export const vehicleSchema = z.object({
   id: uuidSchema,
@@ -86,10 +87,12 @@ export const createVehicleSchema = z.object({
   displacementCc: z.int().positive().nullish(),
   fuel: z.enum(FUELS).nullish(),
 });
-export const updateVehicleSchema = createVehicleSchema
-  .omit({ id: true, parentId: true, level: true })
-  .extend({ archived: z.boolean() })
-  .partial();
+export const updateVehicleSchema = requireChange(
+  createVehicleSchema
+    .omit({ id: true, parentId: true, level: true })
+    .extend({ archived: z.boolean() })
+    .partial(),
+);
 
 export const ALIAS_TARGETS = ['vehicle', 'category', 'ignore'] as const;
 export const aliasSchema = z.object({
@@ -170,19 +173,21 @@ export const createPartSchema = z
     path: ['nameAr'],
   });
 
-export const updatePartSchema = z
-  .object({
-    sku: skuSchema,
-    nameAr: nameSchema.nullable(),
-    nameEn: nameSchema.nullable(),
-    qualityGrade: qualityGradeSchema.nullable(),
-    brandId: uuidSchema.nullable(),
-    categoryId: uuidSchema.nullable(),
-    unit: unitSchema,
-    notes: z.string().max(2000).nullable(),
-    archived: z.boolean(),
-  })
-  .partial();
+export const updatePartSchema = requireChange(
+  z
+    .object({
+      sku: skuSchema,
+      nameAr: nameSchema.nullable(),
+      nameEn: nameSchema.nullable(),
+      qualityGrade: qualityGradeSchema.nullable(),
+      brandId: uuidSchema.nullable(),
+      categoryId: uuidSchema.nullable(),
+      unit: unitSchema,
+      notes: z.string().max(2000).nullable(),
+      archived: z.boolean(),
+    })
+    .partial(),
+);
 
 /** Bulk edit for the "needs review" list (e.g. grade 300 imported parts at once). */
 export const bulkUpdatePartsSchema = z.object({
@@ -228,6 +233,11 @@ export const supersedeSchema = z.object({
   effectiveAt: timestampSchema.optional(),
   reason: z.string().max(500).nullish(),
 });
+/** Ends a wrong or outdated supersession; the links it copied may be removed with it. */
+export const removeSupersessionSchema = z.object({
+  removeCopiedFitments: z.boolean().default(false),
+  reason: z.string().trim().max(500).nullish(),
+});
 
 export const linkInterchangeSchema = z.object({ partId: uuidSchema });
 
@@ -247,9 +257,9 @@ export const createPriceListSchema = z.object({
   currency: currencyCodeSchema,
   isDefault: z.boolean().optional(),
 });
-export const updatePriceListSchema = z
-  .object({ name: shortNameSchema, isDefault: z.boolean(), archived: z.boolean() })
-  .partial();
+export const updatePriceListSchema = requireChange(
+  z.object({ name: shortNameSchema, isDefault: z.boolean(), archived: z.boolean() }).partial(),
+);
 
 export const setPriceSchema = z.object({
   id: uuidV7Schema,
@@ -316,7 +326,8 @@ export const searchResultSchema = z.object({
   }),
   results: z.array(
     searchHitSchema.extend({
-      matchedBy: z.enum(['number', 'text', 'vehicle']),
+      /** 'replacement': found through the number or SKU of an archived part it replaces. */
+      matchedBy: z.enum(['number', 'replacement', 'text', 'vehicle']),
       alternatives: z.array(searchHitSchema.extend({ relation: z.enum(ALTERNATIVE_RELATIONS) })),
     }),
   ),
