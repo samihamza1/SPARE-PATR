@@ -1,6 +1,7 @@
 import { PERMISSIONS } from '@autoparts/shared';
 import type {
   Currency,
+  Location,
   MeResponse,
   PartDetail,
   PartSummary,
@@ -200,10 +201,25 @@ export const partDetail = (
   ...overrides,
 });
 
-/** The part and the lookups its page loads. */
+/** The default shop (ADR 0018): every tenant has one. */
+export const LOCATIONS: Location[] = [
+  {
+    id: '01900000-0000-7000-8000-0000000000f1',
+    name: 'المحل',
+    kind: 'shop',
+    isDefault: true,
+    sortOrder: 0,
+    archivedAt: null,
+  },
+];
+
+/** The part and the lookups its page loads (stock card included). */
 export function onPartPage(api: FakeApi, detail: PartDetail): FakeApi {
   return api
     .on(`GET /catalog/parts/${detail.id}`, ok(detail))
+    .on(`GET /stock/parts/${detail.id}`, ok({ partId: detail.id, total: 0, locations: [] }))
+    .on('GET /stock/moves', ok([]))
+    .on('GET /locations', ok(LOCATIONS))
     .on(`GET /catalog/parts/${detail.id}/prices`, ok([]))
     .on('GET /catalog/brands', ok([]))
     .on('GET /catalog/categories', ok([]))
