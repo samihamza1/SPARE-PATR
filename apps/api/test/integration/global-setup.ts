@@ -5,19 +5,19 @@ import { resolveBinary } from 'dbmate';
 
 const migrationsDir = fileURLToPath(new URL('../../../../db/migrations', import.meta.url));
 
-/** Brings the test database up to date. Tests provision their own tenants, so no reset. */
+/**
+ * Recreates the test database. Tests provision their own tenants, but the shared (platform)
+ * vehicles they add are visible to every tenant, so a second run on the same database would
+ * find the first run's rows too.
+ */
 export default function setup(): void {
   loadRootEnv();
-  execFileSync(
-    resolveBinary(),
-    [
-      '--url',
-      requireEnv('TEST_DATABASE_URL'),
-      '--migrations-dir',
-      migrationsDir,
-      '--no-dump-schema',
-      'up',
-    ],
-    { stdio: ['ignore', 'ignore', 'inherit'] },
-  );
+  const url = requireEnv('TEST_DATABASE_URL');
+  for (const command of ['drop', 'up']) {
+    execFileSync(
+      resolveBinary(),
+      ['--url', url, '--migrations-dir', migrationsDir, '--no-dump-schema', command],
+      { stdio: ['ignore', 'ignore', 'inherit'] },
+    );
+  }
 }

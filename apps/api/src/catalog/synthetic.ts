@@ -83,6 +83,8 @@ export interface SyntheticOptions {
   /** Price list currency (a tenant currency); prices get two decimals or fewer. */
   currency: string;
   minorUnits: number;
+  /** When the prices take effect (default: now). Tests with a fixed clock pass theirs. */
+  effectiveAt?: Date;
 }
 
 export interface SyntheticVehicle {
@@ -169,7 +171,7 @@ export async function seedSyntheticCatalog(
   const members: { id: string; tenant_id: string; group_id: string; part_id: string }[] = [];
   const groups: { id: string; tenant_id: string }[] = [];
   const priceListId = newId();
-  const now = new Date();
+  const now = options.effectiveAt ?? new Date();
 
   for (let i = 1; i <= options.parts; i++) {
     const id = newId();
