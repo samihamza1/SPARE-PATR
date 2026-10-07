@@ -94,7 +94,11 @@ export function useFormatQuantity(): (q: number) => string {
 }
 
 /** Quantities of one part per location, with a badge when none is on hand. */
-export function StockBadges({ locations }: { locations: PartStock['locations'] }) {
+export function StockBadges({
+  locations,
+}: {
+  locations: readonly Pick<PartStock['locations'][number], 'locationId' | 'quantity'>[];
+}) {
   const { t } = useTranslation();
   const name = useLocationNames();
   const format = useFormatQuantity();
