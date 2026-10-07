@@ -7,6 +7,7 @@ import {
   CopyButton,
   Group,
   Modal,
+  Select,
   Stack,
   Table,
   Text,
@@ -21,6 +22,7 @@ import { useAuth } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { useFormatDateTime } from '../format';
 import { Form, useRequired } from '../forms';
+import { inventoryKeys, useLocationNames, useLocations } from '../inventory/common';
 
 const DEVICES_KEY = ['devices'] as const;
 
@@ -90,6 +92,19 @@ export function DevicesPage() {
       await refresh();
     },
   });
+  const locations = useLocations();
+  const locationName = useLocationNames();
+  const shops = (locations.data ?? [])
+    .filter((l) => l.kind === 'shop')
+    .map((l) => ({ value: l.id, label: l.name }));
+  const move = useMutation({
+    mutationFn: ({ device, locationId }: { device: Device; locationId: string }) =>
+      api<Device>('PATCH', `/devices/${device.id}`, { locationId }),
+    onSuccess: async () => {
+      await refresh();
+      await queryClient.invalidateQueries({ queryKey: inventoryKeys.locations });
+    },
+  });
   const revoke = useMutation({
     mutationFn: (device: Device) => api<Device>('POST', `/devices/${device.id}/revoke`),
     onSuccess: refresh,
@@ -124,11 +139,14 @@ export function DevicesPage() {
           </Button>
         </Group>
       </Form>
-      <ErrorAlert error={devices.error ?? create.error ?? newCode.error ?? revoke.error} />
+      <ErrorAlert
+        error={devices.error ?? create.error ?? newCode.error ?? revoke.error ?? move.error}
+      />
       <Table striped>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{t('devices.name')}</Table.Th>
+            <Table.Th>{t('devices.location')}</Table.Th>
             <Table.Th>{t('devices.status')}</Table.Th>
             <Table.Th>{t('devices.lastSeen')}</Table.Th>
             <Table.Th>{t('common.actions')}</Table.Th>
@@ -138,6 +156,23 @@ export function DevicesPage() {
           {devices.data?.map((d) => (
             <Table.Tr key={d.id}>
               <Table.Td>{d.name}</Table.Td>
+              <Table.Td>
+                {d.revokedAt === null ? (
+                  <Select
+                    aria-label={t('devices.location')}
+                    data={shops}
+                    value={d.locationId}
+                    allowDeselect={false}
+                    size="xs"
+                    onChange={(locationId) => {
+                      if (locationId !== null && locationId !== d.locationId)
+                        move.mutate({ device: d, locationId });
+                    }}
+                  />
+                ) : (
+                  locationName(d.locationId)
+                )}
+              </Table.Td>
               <Table.Td>{status(d)}</Table.Td>
               <Table.Td>{formatDateTime(d.lastSeenAt)}</Table.Td>
               <Table.Td>
