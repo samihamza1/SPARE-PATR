@@ -56,3 +56,16 @@ records how those rules are implemented, so later work does not erode them.
 - Pre-tenant lookups (e.g. resolving a shop code at login) will need a narrow
   `SECURITY DEFINER` function, reviewed like any other policy exception.
 - Adding a table means adding its policy and grants in the same migration, or CI fails.
+
+## Addendum (2026-10-07, Sprints 1–3 review)
+
+The catalog guard (`db/test/rls-catalog.test.ts`) is stricter:
+
+- A policy must use the tenant predicate exactly. Text that merely mentions
+  `current_tenant_id()` is not enough.
+- `tenant_id` must be NOT NULL outside the shared tables.
+- A reference into a shared table needs a visibility trigger on INSERT and UPDATE of that
+  column.
+- Append-only tables are found from their `forbid_mutation` triggers, with a required
+  list.
+- Each check has a self-test that makes it fail.

@@ -24,24 +24,27 @@ cp .env.example .env      # local-only credentials
 pnpm db:up                # PostgreSQL 18; first start creates roles and databases
 pnpm db:migrate
 pnpm test
+pnpm --filter @autoparts/e2e exec playwright install chromium   # once, for pnpm test:e2e
 pnpm dev                  # API :3000, POS :5173, back office :5174
 ```
 
 ## Commands
 
-| Command                           | Does                                                                                                                    |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                        | Runs the API and both web apps                                                                                          |
-| `pnpm lint` / `pnpm format:check` | ESLint (incl. money and i18n guard rails) / Prettier                                                                    |
-| `pnpm typecheck`                  | `tsc` in every package                                                                                                  |
-| `pnpm test`                       | `test:unit` + `test:db`                                                                                                 |
-| `pnpm test:db`                    | Recreates `autoparts_test`, checks every migration down and up, runs RLS tests and API integration tests                |
-| `pnpm test:e2e`                   | Playwright end-to-end journey (API + DB + back office in Chromium)                                                      |
-| `pnpm db:migrate`                 | Applies pending migrations to the dev database                                                                          |
-| `pnpm db:new <name>`              | Creates `db/migrations/<timestamp>_<name>.sql`                                                                          |
-| `pnpm db:codegen`                 | Regenerates Kysely types; run after every migration and commit                                                          |
-| `pnpm tenant:create --slug … `    | Provisions a tenant with its functional currency, system roles and owner user (see `apps/api/src/cli/tenant-create.ts`) |
-| `pnpm build`                      | Builds the API (tsup) and the web apps (Vite)                                                                           |
+| Command                           | Does                                                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                        | Runs the API and both web apps                                                                                                             |
+| `pnpm lint` / `pnpm format:check` | ESLint (incl. money and i18n guard rails) / Prettier                                                                                       |
+| `pnpm typecheck`                  | `tsc` in every package                                                                                                                     |
+| `pnpm test`                       | `test:unit` + `test:db`                                                                                                                    |
+| `pnpm test:db`                    | Recreates `autoparts_test`, checks every migration down and up, runs RLS tests and API integration tests                                   |
+| `pnpm test:e2e`                   | Playwright end-to-end journey (API + DB + back office in Chromium); install Chromium first (above) or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` |
+| `pnpm db:migrate`                 | Applies pending migrations to the dev database                                                                                             |
+| `pnpm db:new <name>`              | Creates `db/migrations/<timestamp>_<name>.sql`                                                                                             |
+| `pnpm db:codegen`                 | Regenerates Kysely types; run after every migration and commit                                                                             |
+| `pnpm db:manifest`                | Records every migration's SHA-256 in `db/migrations.sha256`; run after every migration and commit                                          |
+| `pnpm db:check`                   | Checks migrations against the manifest (CI also checks that applied ones never change)                                                     |
+| `pnpm tenant:create --slug … `    | Provisions a tenant with its functional currency, system roles and owner user (see `apps/api/src/cli/tenant-create.ts`)                    |
+| `pnpm build`                      | Builds the API (tsup) and the web apps (Vite)                                                                                              |
 
 ## Database roles
 

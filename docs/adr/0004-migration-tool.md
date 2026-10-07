@@ -39,3 +39,14 @@ the same locally, in CI and in deployment, and be safe to run concurrently.
 
 - No checksum protection inside the tool; the CI rule above covers it.
 - New contributors need only `pnpm install` (no global binaries).
+
+## Addendum (2026-10-07, Sprints 1–3 review)
+
+- dbmate keeps no checksums, and the pull-request check compared with a base branch that
+  had no migrations, so an edited migration could pass.
+- `db/migrations.sha256` now records the SHA-256 of every migration
+  (`pnpm db:manifest`).
+- CI runs `scripts/check-migrations-immutable.sh` on every push and pull request:
+  - every file must match its recorded hash;
+  - every migration recorded on the base, or on the commit before a push, must be
+    unchanged.
