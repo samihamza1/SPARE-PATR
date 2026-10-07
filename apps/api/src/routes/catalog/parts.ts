@@ -9,6 +9,7 @@ import {
   newId,
   normalizePartNumber,
   normalizeSearchText,
+  removeSupersessionSchema,
   supersedeSchema,
   updatePartSchema,
   uuidSchema,
@@ -18,9 +19,9 @@ import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { z } from 'zod';
-import { audit } from '../../audit';
+import { audit, auditMany } from '../../audit';
 import type { PlatformDeps } from '../../auth/plugin';
-import { conflict, notFound } from '../../errors';
+import { ApiError, conflict, notFound } from '../../errors';
 import type { Trx } from '../../catalog/mappers';
 import {
   PART_COLUMNS,
@@ -191,7 +192,9 @@ export function partRoutes(app: FastifyInstance, deps: PlatformDeps): void {
                     .selectFrom('part_prices as pp')
                     .select(sql`1`.as('one'))
                     .whereRef('pp.part_id', '=', 'p.id')
-                    .where('pp.price_list_id', '=', list.id),
+                    .where('pp.price_list_id', '=', list.id)
+                    // "No price" as search and the part page see it: none in effect now.
+                    .where('pp.effective_at', '<=', now()),
                 ),
               ),
             );
@@ -299,7 +302,14 @@ export function partRoutes(app: FastifyInstance, deps: PlatformDeps): void {
     (request) =>
       inTenant(deps, request, async (trx) => {
         const { ids, set } = request.body;
-        const result = await trx
+        const columns = ['id', 'quality_grade', 'brand_id', 'category_id'] as const;
+        const before = await trx
+          .selectFrom('parts')
+          .select(columns)
+          .where('id', 'in', ids)
+          .forUpdate()
+          .execute();
+        const updated = await trx
           .updateTable('parts')
           .set({
             ...(set.qualityGrade !== undefined && { quality_grade: set.qualityGrade }),
@@ -307,14 +317,28 @@ export function partRoutes(app: FastifyInstance, deps: PlatformDeps): void {
             ...(set.categoryId !== undefined && { category_id: set.categoryId }),
           })
           .where('id', 'in', ids)
-          .executeTakeFirst();
-        await audit(
+          .returning(columns)
+          .execute();
+        // One entry per part actually changed, with what it was before (like a single PATCH).
+        const snapshot = (p: (typeof updated)[number]) => ({
+          qualityGrade: p.quality_grade,
+          brandId: p.brand_id,
+          categoryId: p.category_id,
+        });
+        const beforeById = new Map(before.map((p) => [p.id, snapshot(p)]));
+        await auditMany(
           trx,
           actorOf(request),
-          { action: 'part.bulk_update', entityType: 'part', after: { ids, set } },
+          updated.map((p) => ({
+            action: 'part.bulk_update',
+            entityType: 'part',
+            entityId: p.id,
+            before: beforeById.get(p.id),
+            after: snapshot(p),
+          })),
           now(),
         );
-        return { updated: Number(result.numUpdatedRows) };
+        return { updated: updated.length };
       }),
   );
 
@@ -516,6 +540,14 @@ export function partRoutes(app: FastifyInstance, deps: PlatformDeps): void {
       inTenant(deps, request, async (trx, auth) => {
         const { id } = request.params;
         const b = request.body;
+        // A replacement must be sellable: an archived part is hidden from search.
+        const target = await trx
+          .selectFrom('parts')
+          .select('archived_at')
+          .where('id', '=', b.newPartId)
+          .executeTakeFirst();
+        if (target === undefined) throw notFound();
+        if (target.archived_at !== null) throw new ApiError(409, 'catalog.archived');
         await trx
           .insertInto('supersessions')
           .values({
@@ -554,6 +586,8 @@ export function partRoutes(app: FastifyInstance, deps: PlatformDeps): void {
               part_id: b.newPartId,
               vehicle_id: f.vehicle_id,
               note: f.note,
+              // Remembered so removing a wrong supersession can remove exactly these.
+              supersession_id: b.id,
             })
             .execute();
         }
@@ -570,6 +604,61 @@ export function partRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           now(),
         );
         return loadPartDetail(trx, id, now());
+      }),
+  );
+
+  r.post(
+    '/catalog/parts/:id/supersede/remove',
+    {
+      schema: { params: idParamsSchema, body: removeSupersessionSchema },
+      config: { access: MANAGE },
+    },
+    (request) =>
+      inTenant(deps, request, async (trx) => {
+        const { id } = request.params;
+        const b = request.body;
+        const at = now();
+        const active = await trx
+          .selectFrom('supersessions')
+          .select(['id', 'new_part_id', 'effective_at', 'reason'])
+          .where('old_part_id', '=', id)
+          .where('removed_at', 'is', null)
+          .forUpdate()
+          .executeTakeFirst();
+        if (active === undefined) throw notFound();
+        await trx
+          .updateTable('supersessions')
+          .set({ removed_at: at })
+          .where('id', '=', active.id)
+          .execute();
+        const removedFitments = b.removeCopiedFitments
+          ? await trx
+              .updateTable('fitments')
+              .set({ removed_at: at })
+              .where('supersession_id', '=', active.id)
+              .where('removed_at', 'is', null)
+              .returning(['id', 'vehicle_id'])
+              .execute()
+          : [];
+        await audit(
+          trx,
+          actorOf(request),
+          {
+            action: 'part.supersede_remove',
+            entityType: 'part',
+            entityId: id,
+            before: {
+              supersessionId: active.id,
+              newPartId: active.new_part_id,
+              effectiveAt: active.effective_at.toISOString(),
+              reason: active.reason,
+            },
+            after: { fitmentsRemoved: removedFitments.map((f) => f.vehicle_id) },
+            reason: b.reason ?? null,
+          },
+          at,
+        );
+        return loadPartDetail(trx, id, at);
       }),
   );
 }

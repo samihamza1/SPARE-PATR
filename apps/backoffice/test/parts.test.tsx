@@ -154,3 +154,32 @@ describe('audit log', () => {
     expect(rows.indexOf('price')).toBeLessThan(rows.indexOf('priceListId'));
   });
 });
+
+describe('replacement', () => {
+  it('removes a wrong replacement, with the vehicles it copied, after asking', async () => {
+    const replacement = part(2, 'SKY-2', null, 'فلتر جديد');
+    const detail = partDetail(part(1, 'SKY-1', null, 'فلتر'), { supersededBy: replacement });
+    const api = onPartPage(new FakeApi(), detail)
+      .on('GET /auth/me', ok(me(ALL)))
+      .on(
+        `POST /catalog/parts/${detail.id}/supersede/remove`,
+        ok({ ...detail, supersededBy: null }),
+      );
+    api.install();
+    vi.stubGlobal('confirm', () => true);
+    await renderApp(`/catalog/parts/${detail.id}`);
+    fireEvent.change(await screen.findByLabelText(labelled(ar.catalog.reason)), {
+      target: { value: 'wrong part' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: ar.catalog.removeSupersession }));
+    await waitFor(() => {
+      expect(api.calls.find((c) => c.path.endsWith('/supersede/remove'))?.body).toEqual({
+        removeCopiedFitments: true,
+        reason: 'wrong part',
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: ar.catalog.removeSupersession })).toBeNull();
+    });
+  });
+});

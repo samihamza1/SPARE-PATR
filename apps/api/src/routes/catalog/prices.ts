@@ -98,6 +98,9 @@ export function priceRoutes(app: FastifyInstance, deps: PlatformDeps): void {
         const { id } = request.params;
         const before = await loadPriceList(trx, id);
         const b = request.body;
+        // An archived list cannot be the default: the currency would be left with none.
+        const archivedAfter = b.archived ?? before.archivedAt !== null;
+        if (b.isDefault === true && archivedAfter) throw new ApiError(409, 'catalog.archived');
         if (b.isDefault === true) await demoteDefault(trx, before.currency, id);
         await trx
           .updateTable('price_lists')

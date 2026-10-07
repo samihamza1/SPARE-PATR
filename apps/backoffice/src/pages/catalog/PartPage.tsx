@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Group,
   Select,
   SimpleGrid,
@@ -312,6 +313,8 @@ export function PartPage() {
   const [number, setNumber] = useState('');
   const [kind, setKind] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  // A wrong replacement usually brought wrong vehicles with it.
+  const [removeCopied, setRemoveCopied] = useState(true);
   const numberRequired = useRequired({ number, kind });
 
   const update = (p: PartDetail) => {
@@ -506,6 +509,38 @@ export function PartPage() {
           <Group>
             <Text fw={600}>{t('catalog.supersededBy')}:</Text>
             <PartLink part={p.supersededBy} />
+          </Group>
+        )}
+        {manage && p.supersededBy !== null && (
+          <Group align="flex-end">
+            <TextInput
+              label={t('catalog.reason')}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.currentTarget.value);
+              }}
+            />
+            <Checkbox
+              label={t('catalog.removeCopiedFitments')}
+              checked={removeCopied}
+              onChange={(e) => {
+                setRemoveCopied(e.currentTarget.checked);
+              }}
+            />
+            <Button
+              variant="light"
+              color="red"
+              onClick={() => {
+                const sku = p.supersededBy?.sku ?? '';
+                if (!window.confirm(t('catalog.removeSupersessionConfirm', { sku }))) return;
+                act.mutate({
+                  path: '/supersede/remove',
+                  body: { removeCopiedFitments: removeCopied, reason: blankToNull(reason) },
+                });
+              }}
+            >
+              {t('catalog.removeSupersession')}
+            </Button>
           </Group>
         )}
         {p.supersedes.map((x) => (

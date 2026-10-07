@@ -211,6 +211,17 @@ describe('parts', () => {
       set: { qualityGrade: 'good' },
     });
     expect(res.json()).toEqual({ updated: 2 });
+    // One audit entry per part, with what it was before.
+    const bulk = await auditOf(shop.tenantId, 'part.bulk_update');
+    expect(bulk.map((e) => [e.entity_id, e.before, e.after])).toEqual(
+      expect.arrayContaining(
+        [a.id, b.id].map((id) => [
+          id,
+          { qualityGrade: null, brandId: null, categoryId: null },
+          { qualityGrade: 'good', brandId: null, categoryId: null },
+        ]),
+      ),
+    );
     expect(
       (await owner.get('/catalog/parts?needsReview=ungraded&q=review')).json<PartSummary[]>(),
     ).toEqual([]);
@@ -277,6 +288,55 @@ describe('parts', () => {
       newPartId: old.id,
     });
     expect(cycle.statusCode).toBe(400);
+  });
+
+  it('refuses a change that sets nothing', async () => {
+    const p = await createPart(owner, 'NOOP-1');
+    const res = await owner.patch(`/catalog/parts/${p.id}`, {});
+    expect(res.statusCode).toBe(400);
+    expect(res.json<{ error: { issues: { message: string }[] } }>().error.issues).toEqual([
+      expect.objectContaining({ message: 'update.nothing_to_set' }),
+    ]);
+  });
+
+  it('removes a wrong supersession, and on request the vehicles it copied', async () => {
+    const old = await createPart(owner, 'SUP-101');
+    const wrong = await createPart(owner, 'SUP-102');
+    const right = await createPart(owner, 'SUP-103');
+    await fit(owner, old.id, gen2008);
+    await fit(owner, wrong.id, gen2022);
+    const sup = await owner.post(`/catalog/parts/${old.id}/supersede`, {
+      id: newId(),
+      newPartId: wrong.id,
+    });
+    expect(sup.statusCode, sup.body).toBe(200);
+    const copied = (await owner.get(`/catalog/parts/${wrong.id}`)).json<PartDetail>();
+    expect(copied.fitments.map((f) => f.vehicleId).sort()).toEqual([gen2008, gen2022].sort());
+
+    const removed = await owner.post(`/catalog/parts/${old.id}/supersede/remove`, {
+      removeCopiedFitments: true,
+      reason: 'wrong part picked',
+    });
+    expect(removed.statusCode, removed.body).toBe(200);
+    expect(removed.json<PartDetail>().supersededBy).toBeNull();
+    // Only the copied link goes; the new part's own vehicle stays.
+    const after = (await owner.get(`/catalog/parts/${wrong.id}`)).json<PartDetail>();
+    expect(after.fitments.map((f) => f.vehicleId)).toEqual([gen2022]);
+    expect(after.supersedes).toEqual([]);
+    const [entry] = (await auditOf(shop.tenantId, 'part.supersede_remove')).filter(
+      (e) => e.entity_id === old.id,
+    );
+    expect(entry?.before).toMatchObject({ newPartId: wrong.id });
+    expect(entry?.after).toEqual({ fitmentsRemoved: [gen2008] });
+    expect(entry?.reason).toBe('wrong part picked');
+
+    const again = await owner.post(`/catalog/parts/${old.id}/supersede`, {
+      id: newId(),
+      newPartId: right.id,
+    });
+    expect(again.json<PartDetail>().supersededBy?.sku).toBe('SUP-103');
+    const none = await owner.post(`/catalog/parts/${wrong.id}/supersede/remove`, {});
+    expect(none.statusCode).toBe(404);
   });
 });
 
@@ -386,6 +446,66 @@ describe('prices', () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  it('counts a part as unpriced until its first price takes effect', async () => {
+    const p = await createPart(owner, 'PRC-FUT');
+    const at = new Date(env.clock.now.getTime() + 60 * MINUTE).toISOString();
+    const res = await owner.post(`/catalog/price-lists/${retailList}/prices`, {
+      id: newId(),
+      partId: p.id,
+      price: '9.00',
+      effectiveAt: at,
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const unpriced = (await owner.get('/catalog/parts?needsReview=no_price&q=PRC-FUT')).json<
+      PartSummary[]
+    >();
+    expect(unpriced.map((x) => x.sku)).toEqual(['PRC-FUT']);
+  });
+
+  it('never makes an archived list the default', async () => {
+    const old = (
+      await owner.post('/catalog/price-lists', { id: newId(), name: 'Old retail', currency: 'AAA' })
+    ).json<PriceList>();
+    await owner.patch(`/catalog/price-lists/${old.id}`, { archived: true });
+    const res = await owner.patch(`/catalog/price-lists/${old.id}`, { isDefault: true });
+    expect(res.statusCode).toBe(409);
+    expect(errorCode(res)).toBe('catalog.archived');
+    const both = await owner.patch(`/catalog/price-lists/${retailList}`, {
+      isDefault: true,
+      archived: true,
+    });
+    expect(errorCode(both)).toBe('catalog.archived');
+    const lists = (await owner.get('/catalog/price-lists')).json<PriceList[]>();
+    expect(lists.find((l) => l.id === retailList)).toMatchObject({
+      isDefault: true,
+      archivedAt: null,
+    });
+  });
+
+  it('stores a cash increment as its value and checks it against the minor units', async () => {
+    const created = await owner.post('/currencies', {
+      id: newId(),
+      code: 'CCC',
+      minorUnits: 2,
+      cashIncrement: '0.050',
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const ccc = created.json<{ id: string; cashIncrement: string }>();
+    expect(ccc.cashIncrement).toBe('0.05');
+    const fine = await owner.patch(`/currencies/${ccc.id}`, { cashIncrement: '0.001' });
+    expect(fine.statusCode).toBe(400);
+    expect(fine.json<{ error: { issues: unknown[] } }>().error.issues).toEqual([
+      { path: 'cashIncrement', message: 'currency.cash_increment_scale' },
+    ]);
+    const zero = await owner.post('/currencies', {
+      id: newId(),
+      code: 'DDD',
+      minorUnits: 0,
+      cashIncrement: '0',
+    });
+    expect(zero.statusCode).toBe(400);
+  });
 });
 
 describe('search (BRIEF scenario 1)', () => {
@@ -493,6 +613,116 @@ describe('search (BRIEF scenario 1)', () => {
     const other = await search(otherOwner, 'فحمات امامية لاندكروزر 2015');
     expect(other.results).toEqual([]);
     expect((await search(otherOwner, '04465 60320')).results).toEqual([]);
+  });
+});
+
+describe('search: numbers, vehicles, years and replacements (review fixes)', () => {
+  let corolla: string;
+  let peugeot2008: string;
+
+  const search = async (q: string, query = '') => {
+    const res = await owner.get(`/catalog/search?q=${encodeURIComponent(q)}${query}`);
+    expect(res.statusCode, res.body).toBe(200);
+    return res.json<SearchResult>();
+  };
+  const skus = (r: SearchResult, matchedBy?: string) =>
+    r.results
+      .filter((x) => matchedBy === undefined || x.matchedBy === matchedBy)
+      .map((x) => x.part.sku)
+      .sort();
+
+  beforeAll(async () => {
+    corolla = await platformVehicle('model', 'Corolla', make);
+    for (const [sku, vehicle] of [
+      ['RX-COR', corolla],
+      ['RX-LC', model],
+    ] as const) {
+      const p = await createPart(owner, sku, { nameEn: 'Rear pads' });
+      await fit(owner, p.id, vehicle);
+    }
+    await createPart(owner, 'RX-DECOY', { nameEn: 'Decoy', numbers: [{ number: '04465-99999' }] });
+
+    const type = await platformVehicle('type', `Car ${newId().slice(-6)}`, null);
+    const peugeot = await platformVehicle('make', 'Peugeot', type);
+    peugeot2008 = await platformVehicle('model', '2008', peugeot);
+    const p308 = await platformVehicle('model', '308', peugeot);
+    for (const [sku, gen] of [
+      ['RX-PG2008', await platformVehicle('generation', 'P24', peugeot2008, { year_from: 2019 })],
+      [
+        'RX-PG308',
+        await platformVehicle('generation', 'T7', p308, { year_from: 2007, year_to: 2013 }),
+      ],
+    ] as const) {
+      const p = await createPart(owner, sku, { nameEn: 'Rear pads' });
+      await fit(owner, p.id, gen);
+    }
+    await createPart(owner, '2015', { nameEn: 'Numeric SKU part' });
+  });
+
+  it('finds a dashed or spaced number typed next to a word, and only that number', async () => {
+    for (const q of ['فحمات 04465-60320', 'pads 04465 60320', '04465-60320 فحمات']) {
+      const result = await search(q);
+      expect(result.interpretation.partNumber, q).toBe('0446560320');
+      expect(skus(result, 'number'), q).toEqual(['BP-GD', 'BP-OEM', 'BP-UNG']);
+    }
+  });
+
+  it('keeps the most specific vehicle named, and a chosen vehicle restricts the typed one', async () => {
+    const named = await search('toyota land cruiser rear pads');
+    // Other test files add their own shared Toyota and Land Cruiser rows; no make remains.
+    expect(named.interpretation.vehicles.map((v) => v.level)).not.toContain('make');
+    expect(named.interpretation.vehicles.map((v) => v.id)).toContain(model);
+    expect(skus(named)).toEqual(['RX-LC']);
+    const chosen = await search('rear pads toyota', `&vehicleId=${corolla}`);
+    expect(skus(chosen)).toEqual(['RX-COR']);
+  });
+
+  it('reads a model named like a year, a range of years, and a numeric SKU', async () => {
+    const pg = await search('rear pads peugeot 2008');
+    expect(pg.interpretation.year).toBeNull();
+    expect(pg.interpretation.vehicles.map((v) => v.id)).toEqual([peugeot2008]);
+    expect(skus(pg)).toEqual(['RX-PG2008']);
+
+    const range = await search('فحمات امامية لاندكروزر 2015-2023');
+    expect(range.interpretation.year).toBe(2015);
+    expect(skus(range)).toEqual(['BP-J300', 'BP-OEM']);
+
+    const numeric = await search('2015');
+    expect(numeric.results.map((r) => [r.part.sku, r.matchedBy])).toEqual([['2015', 'number']]);
+  });
+
+  it('leads from an archived part to the part that replaces it today', async () => {
+    const oldPart = await createPart(owner, 'RX-OLD1', { numbers: [{ number: 'X-777001' }] });
+    const newPart = await createPart(owner, 'RX-NEW1');
+    await owner.post(`/catalog/parts/${oldPart.id}/supersede`, {
+      id: newId(),
+      newPartId: newPart.id,
+    });
+    await owner.patch(`/catalog/parts/${oldPart.id}`, { archived: true });
+    const byOldNumber = await search('X-777001');
+    expect(byOldNumber.results.map((r) => [r.part.sku, r.matchedBy])).toEqual([
+      ['RX-NEW1', 'replacement'],
+    ]);
+
+    const [a, b, c] = await Promise.all(
+      ['CHN-001', 'CHN-002', 'CHN-003'].map((sku) => createPart(owner, sku)),
+    );
+    if (a === undefined || b === undefined || c === undefined) throw new Error();
+    await owner.post(`/catalog/parts/${a.id}/supersede`, { id: newId(), newPartId: b.id });
+    await owner.post(`/catalog/parts/${b.id}/supersede`, { id: newId(), newPartId: c.id });
+    await owner.patch(`/catalog/parts/${b.id}`, { archived: true });
+    const chain = await search('CHN-001');
+    expect(chain.results.map((r) => r.part.sku)).toEqual(['CHN-001']);
+    expect(chain.results[0]?.alternatives.map((x) => [x.part.sku, x.relation])).toEqual([
+      ['CHN-003', 'replacement'],
+    ]);
+
+    const onArchived = await owner.post(`/catalog/parts/${newPart.id}/supersede`, {
+      id: newId(),
+      newPartId: b.id,
+    });
+    expect(onArchived.statusCode).toBe(409);
+    expect(errorCode(onArchived)).toBe('catalog.archived');
   });
 });
 
