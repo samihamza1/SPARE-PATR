@@ -65,13 +65,19 @@ test('owner sets up a cashier, who sees only what a cashier may see', async ({ p
   await expect(page.getByRole('heading', { name: 'أهلاً كاشير أول' })).toBeVisible();
 
   const nav = page.getByRole('navigation', { name: 'القائمة' });
-  // Catalog pages are readable by everyone; import and admin pages are not offered.
+  // Catalog pages are readable by everyone; import and admin pages are not offered. A
+  // cashier sees stock in every location (without cost), takes part in counts, and sees
+  // the locations and exchange rates (product owner, 2026-10-06).
   await expect(nav.getByRole('link')).toHaveText([
     'الرئيسية',
     'البحث عن قطعة',
     'القطع',
     'السيارات',
     'إعداد الكتالوج',
+    'المخزون',
+    'الجرد',
+    'المواقع',
+    'أسعار الصرف',
     'الأدوار والصلاحيات',
   ]);
 

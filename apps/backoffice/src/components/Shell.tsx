@@ -1,5 +1,15 @@
 import type { Permission } from '@autoparts/shared';
-import { AppShell, Burger, Button, Group, NavLink, Stack, Text, Title } from '@mantine/core';
+import {
+  AppShell,
+  Burger,
+  Button,
+  Group,
+  NavLink,
+  ScrollArea,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
@@ -113,20 +123,23 @@ export function Shell() {
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="xs" aria-label={t('nav.menu')}>
-        <Stack gap={2}>
-          {NAV.filter((item) => item.permission === undefined || can(item.permission)).map(
-            (item) => (
-              <NavLink
-                key={item.to}
-                component={RouterLink}
-                to={item.to}
-                end={item.to === '/'}
-                label={t(item.label)}
-                onClick={close}
-              />
-            ),
-          )}
-        </Stack>
+        {/* The menu outgrows short screens; it scrolls on its own, below the header. */}
+        <AppShell.Section grow component={ScrollArea}>
+          <Stack gap={2}>
+            {NAV.filter((item) => item.permission === undefined || can(item.permission)).map(
+              (item) => (
+                <NavLink
+                  key={item.to}
+                  component={RouterLink}
+                  to={item.to}
+                  end={item.to === '/'}
+                  label={t(item.label)}
+                  onClick={close}
+                />
+              ),
+            )}
+          </Stack>
+        </AppShell.Section>
       </AppShell.Navbar>
       <AppShell.Main>
         <Outlet />
