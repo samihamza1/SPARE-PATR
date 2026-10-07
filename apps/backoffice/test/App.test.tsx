@@ -1,4 +1,4 @@
-import type { ImportBatchDetail } from '@autoparts/shared';
+import type { ImportBatchDetail, OpeningDraft, StockCount } from '@autoparts/shared';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ar from '../src/locales/ar.json';
@@ -7,6 +7,7 @@ import {
   ALL,
   CURRENCIES,
   FakeApi,
+  LOCATIONS,
   ROLES,
   SETTINGS,
   USERS,
@@ -265,6 +266,34 @@ describe('every page renders in both languages', () => {
     appliedAt: null,
     vehicleCodes: [{ code: 'LC', codeNorm: 'lc', rows: 1, mapping: null }],
   };
+  const count: StockCount = {
+    id: id(70),
+    locationId: LOCATIONS[0]?.id ?? '',
+    scope: 'all',
+    categoryId: null,
+    status: 'open',
+    note: null,
+    createdAt: '2026-10-07T08:00:00.000Z',
+    createdBy: id(1),
+    closedAt: null,
+    documentId: null,
+    lines: 0,
+    counted: 0,
+  };
+  const draft: OpeningDraft = {
+    id: id(71),
+    batchId: importBatch.id,
+    fileName: 'stock.xlsx',
+    locationId: LOCATIONS[0]?.id ?? '',
+    asOf: '2026-10-07',
+    costCurrency: 'AAA',
+    functionalCurrency: 'AAA',
+    fxRate: null,
+    status: 'draft',
+    counts: { ready: 0, needs_cost: 0, needs_quantity: 0, excluded: 0 },
+    totals: { quantity: 0, amount: '0', functionalAmount: '0' },
+    postedAt: null,
+  };
   // Each page with what shows it has loaded: its heading, in the page's language.
   const pages: [route: string, heading: (l: typeof ar) => string][] = [
     ['/', (l) => l.home.welcome.replace('{{name}}', 'سامي')],
@@ -280,6 +309,16 @@ describe('every page renders in both languages', () => {
     ['/catalog/setup', (l) => l.setup.title],
     ['/catalog/imports', (l) => l.import.title],
     [`/catalog/imports/${importBatch.id}`, () => 'stock.xlsx'],
+    ['/locations', (l) => l.locations.title],
+    ['/fx-rates', (l) => l.fx.title],
+    ['/inventory/stock', (l) => l.inventory.stockTitle],
+    ['/inventory/adjust', (l) => l.inventory.adjustTitle],
+    ['/inventory/transfer', (l) => l.inventory.transferTitle],
+    ['/inventory/opening', (l) => l.opening.title],
+    [`/inventory/opening/${draft.id}`, (l) => l.opening.title],
+    ['/inventory/counts', (l) => l.count.title],
+    [`/inventory/counts/${count.id}`, (l) => l.count.titleAt.replace('{{location}}', 'المحل')],
+    ['/inventory/review', (l) => l.review.title],
   ];
   // Any "namespace.key" text is a leaked translation key.
   const leakedKey = new RegExp(`\\b(${Object.keys(ar).join('|')})\\.[a-zA-Z_]+`);
@@ -300,6 +339,19 @@ describe('every page renders in both languages', () => {
         .on('GET /catalog/imports', ok([importBatch]))
         .on(`GET /catalog/imports/${importBatch.id}`, ok(importBatch))
         .on(`GET /catalog/imports/${importBatch.id}/rows`, ok([]))
+        .on(
+          'GET /fx-rates/current',
+          ok({ businessDate: '2026-10-07', functionalCurrency: 'AAA', rates: [] }),
+        )
+        .on('GET /fx-rates', ok([]))
+        .on('GET /stock/balances', ok([]))
+        .on('GET /stock/counts', ok([count]))
+        .on(`GET /stock/counts/${count.id}`, ok(count))
+        .on(`GET /stock/counts/${count.id}/lines`, ok([]))
+        .on('GET /stock/opening', ok([]))
+        .on(`GET /stock/opening/${draft.id}`, ok(draft))
+        .on(`GET /stock/opening/${draft.id}/lines`, ok([]))
+        .on('GET /stock/review-items', ok([]))
         .install();
       const { container } = await renderApp(route, lng);
       await screen.findByRole('heading', { name: heading(lng === 'ar' ? ar : en) });
