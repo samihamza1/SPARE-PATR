@@ -163,6 +163,7 @@ describe('import wizard', () => {
                 ['Part', 'Name', 'Price'],
                 ['A-1', 'Filter', '10'],
               ],
+              tooLarge: false,
             },
           ],
         },

@@ -19,7 +19,7 @@ import { sql } from 'kysely';
 import { audit } from '../../audit';
 import type { PlatformDeps } from '../../auth/plugin';
 import { ApiError } from '../../errors';
-import { readWorkbook } from '../../catalog/import/read';
+import { inspectWorkbook, readWorkbook } from '../../catalog/import/read';
 import {
   analyseBatch,
   applyBatch,
@@ -57,17 +57,13 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
       config: { access: IMPORT },
       bodyLimit: UPLOAD_BODY_LIMIT,
     },
-    async (request): Promise<InspectImportResult> => {
-      const sheets = await readWorkbook(decode(request.body.contentBase64), request.body.fileName);
-      return {
-        sheets: sheets.map((s) => ({
-          name: s.name,
-          rowCount: s.rows.length,
-          columnCount: Math.max(0, ...s.rows.map((row) => row.length)),
-          rows: s.rows.slice(0, SAMPLE_ROWS),
-        })),
-      };
-    },
+    async (request): Promise<InspectImportResult> => ({
+      sheets: await inspectWorkbook(
+        decode(request.body.contentBase64),
+        request.body.fileName,
+        SAMPLE_ROWS,
+      ),
+    }),
   );
 
   // Stages the chosen sheet: only the mapped columns of its data rows are stored.
