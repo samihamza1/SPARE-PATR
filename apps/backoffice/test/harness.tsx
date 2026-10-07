@@ -1,3 +1,4 @@
+import { PERMISSIONS } from '@autoparts/shared';
 import type {
   Currency,
   MeResponse,
@@ -84,18 +85,8 @@ export function me(
   };
 }
 
-export const ALL: Permission[] = [
-  'audit.read',
-  'catalog.import',
-  'catalog.manage',
-  'cost.view',
-  'devices.manage',
-  'prices.manage',
-  'roles.manage',
-  'sessions.manage',
-  'settings.manage',
-  'users.manage',
-];
+/** Every permission, as an owner holds them. */
+export const ALL: Permission[] = [...PERMISSIONS];
 
 export const ROLES: Role[] = [
   {
