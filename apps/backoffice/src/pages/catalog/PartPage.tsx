@@ -35,6 +35,7 @@ import {
 } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useFormatDateTime } from '../../format';
+import { StockCard } from '../../inventory/StockCard';
 
 const blankToNull = (v: string) => (v.trim() === '' ? null : v.trim());
 
@@ -326,6 +327,8 @@ export function PartPage() {
         {p.archivedAt !== null && <Badge color="gray">{t('catalog.archived')}</Badge>}
       </Group>
       <ErrorAlert error={act.error} />
+
+      <StockCard partId={p.id} replacementId={p.supersededBy?.id ?? null} />
 
       <Card withBorder>
         <Title order={4}>{t('catalog.details')}</Title>
