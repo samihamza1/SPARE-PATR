@@ -1,9 +1,4 @@
-import {
-  IMPORT_MAX_ROWS,
-  importMappingSchema,
-  newId,
-  tenantSettingsSchema,
-} from '@autoparts/shared';
+import { IMPORT_MAX_ROWS, importMappingSchema, newId } from '@autoparts/shared';
 import type {
   ImportBatch,
   ImportBatchDetail,
@@ -17,6 +12,7 @@ import type {
 import { sql } from 'kysely';
 import type { AuditActor } from '../../audit';
 import { ApiError, notFound } from '../../errors';
+import { readMoneySettings } from '../../tenant-settings';
 import type { Trx } from '../mappers';
 import { currentPrices, iso } from '../mappers';
 import type { AnalysedRow, PriceSpec, RawImportRow } from './parse';
@@ -43,11 +39,10 @@ async function priceSpec(trx: Trx, mapping: ImportMapping): Promise<PriceSpec | 
     .where('l.archived_at', 'is', null)
     .executeTakeFirst();
   if (list === undefined) throw notFound();
-  const tenant = await trx.selectFrom('tenants').select('settings').executeTakeFirstOrThrow();
-  const settings = tenantSettingsSchema.safeParse(tenant.settings);
-  // Rounding is a tenant decision made at provisioning; without it nothing is rounded.
-  if (!settings.success) throw new ApiError(400, 'request.invalid');
-  return { minorUnits: list.minor_units, roundingMode: settings.data.money.roundingMode };
+  // Only the money settings matter here (ADR 0022): rounding is a tenant decision, and
+  // without it nothing is rounded (settings.incomplete).
+  const { roundingMode } = await readMoneySettings(trx);
+  return { minorUnits: list.minor_units, roundingMode };
 }
 
 async function assertCostCurrency(trx: Trx, mapping: ImportMapping): Promise<void> {
