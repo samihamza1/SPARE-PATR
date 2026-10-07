@@ -20,6 +20,8 @@
     "db:migrate": "pnpm --filter @autoparts/db migrate",
     "db:new": "pnpm --filter @autoparts/db new",
     "db:codegen": "pnpm --filter @autoparts/db codegen",
+    "db:manifest": "scripts/update-migrations-manifest.sh",
+    "db:check": "scripts/check-migrations-immutable.sh",
     "tenant:create": "pnpm --filter @autoparts/api tenant:create",
     "catalog:seed-synthetic": "pnpm --filter @autoparts/api catalog:seed-synthetic",
     "test:e2e": "pnpm --filter @autoparts/e2e test:e2e"
