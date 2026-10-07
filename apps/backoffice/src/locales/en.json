@@ -625,6 +625,12 @@
       "discarded": "Discarded"
     },
     "createdAt": "Started",
-    "fileTooLarge": "The file is larger than {{max}}. Split it into smaller files or remove the sheets you do not need."
+    "fileTooLarge": "The file is larger than {{max}}. Split it into smaller files or remove the sheets you do not need.",
+    "range": "Rows {{from, number}}–{{to, number}} of {{total, number}}",
+    "rangeOpen": "Rows {{from, number}}–{{to, number}}",
+    "previousRows": "Previous rows",
+    "nextRows": "Next rows",
+    "filterByDecision": "Show rows by result",
+    "filterByIssue": "Show rows by problem"
   }
 }
