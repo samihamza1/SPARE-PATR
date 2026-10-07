@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { passwordSchema } from '../auth/password';
 import { permissionSchema } from '../auth/permissions';
 import { uuidSchema, uuidV7Schema } from '../ids';
-import { currencyCodeSchema, decimalStringSchema } from '../money';
+import { DECIMAL_PATTERN, Decimal, currencyCodeSchema, decimalStringSchema } from '../money';
+import { requireChange } from '../patch';
 import { tenantSettingsSchema } from '../settings';
 
 /**
@@ -34,6 +35,8 @@ export const ERROR_CODES = [
   'import.file_too_large',
   'import.already_applied',
   'import.not_editable',
+  // The target is archived: restore it first (a replacement part, a default price list).
+  'catalog.archived',
   'server.error',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -113,13 +116,15 @@ export const createUserSchema = z.object({
   password: passwordSchema,
 });
 
-export const updateUserSchema = z
-  .object({
-    displayName: displayNameSchema,
-    email: z.email().nullable(),
-    locale: localeSchema.nullable(),
-  })
-  .partial();
+export const updateUserSchema = requireChange(
+  z
+    .object({
+      displayName: displayNameSchema,
+      email: z.email().nullable(),
+      locale: localeSchema.nullable(),
+    })
+    .partial(),
+);
 
 export const resetPasswordSchema = z.object({ password: passwordSchema });
 
@@ -146,9 +151,9 @@ export const createRoleSchema = z.object({
   permissions: z.array(permissionSchema),
 });
 
-export const updateRoleSchema = z
-  .object({ name: displayNameSchema, permissions: z.array(permissionSchema) })
-  .partial();
+export const updateRoleSchema = requireChange(
+  z.object({ name: displayNameSchema, permissions: z.array(permissionSchema) }).partial(),
+);
 
 // --- settings and currencies ------------------------------------------------------------
 
@@ -180,21 +185,32 @@ export const currencySchema = z.object({
 });
 export type Currency = z.infer<typeof currencySchema>;
 
+/**
+ * The smallest cash amount (e.g. "0.25"): above zero. Whether it fits the currency's minor
+ * units is checked by the API, which knows them on update too.
+ */
+const cashIncrementSchema = z
+  .string()
+  .regex(DECIMAL_PATTERN, { message: 'decimal.invalid', abort: true })
+  .refine((s) => new Decimal(s).gt(0), { message: 'currency.cash_increment_positive' });
+
 export const createCurrencySchema = z.object({
   id: uuidV7Schema,
   code: currencyCodeSchema,
   minorUnits: z.int().min(0).max(4),
-  cashIncrement: decimalStringSchema.nullish(),
+  cashIncrement: cashIncrementSchema.nullish(),
   sortOrder: z.int().optional(),
 });
 
-export const updateCurrencySchema = z
-  .object({
-    cashIncrement: decimalStringSchema.nullable(),
-    isActive: z.boolean(),
-    sortOrder: z.int(),
-  })
-  .partial();
+export const updateCurrencySchema = requireChange(
+  z
+    .object({
+      cashIncrement: cashIncrementSchema.nullable(),
+      isActive: z.boolean(),
+      sortOrder: z.int(),
+    })
+    .partial(),
+);
 
 // --- devices ----------------------------------------------------------------------------
 

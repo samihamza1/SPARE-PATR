@@ -5,6 +5,8 @@ export class ApiError extends Error {
   constructor(
     readonly statusCode: number,
     readonly code: ErrorCode,
+    /** Field-level problems, shaped like schema validation issues (path, message key). */
+    readonly issues?: readonly { path: string; message: string }[],
   ) {
     super(code);
     this.name = 'ApiError';
