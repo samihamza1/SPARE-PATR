@@ -25,6 +25,7 @@ import {
   GradeBadge,
   PartPicker,
   Price,
+  VehiclePath,
   VehiclePicker,
   catalogKeys,
   categoryName,
@@ -156,6 +157,8 @@ function DetailsForm({ part, onSaved }: { part: PartDetail; onSaved: (p: PartDet
             variant="light"
             color={part.archivedAt === null ? 'red' : 'green'}
             onClick={() => {
+              // Archiving hides the part from lists and sales search; ask first.
+              if (part.archivedAt === null && !window.confirm(t('catalog.archiveConfirm'))) return;
               save.mutate({ archived: part.archivedAt === null });
             }}
           >
@@ -267,10 +270,12 @@ function PricesCard({ part }: { part: PartDetail }) {
               </Table.Td>
               <Table.Td>{formatDateTime(h.effectiveAt)}</Table.Td>
               <Table.Td>
-                {formatDateTime(h.recordedAt)} ·{' '}
-                <Badge variant="light" size="sm">
-                  {t(`catalog.source.${h.source}`)}
-                </Badge>
+                <Group gap="xs">
+                  {formatDateTime(h.recordedAt)}
+                  <Badge variant="light" size="sm">
+                    {t(`catalog.source.${h.source}`)}
+                  </Badge>
+                </Group>
               </Table.Td>
             </Table.Tr>
           ))}
@@ -313,6 +318,9 @@ export function PartPage() {
     queryClient.setQueryData(key, p);
     void queryClient.invalidateQueries({ queryKey: catalogKeys.parts });
   };
+  // The details form starts again from the server only after its own save, so a number,
+  // vehicle or price added meanwhile does not discard what the user is typing.
+  const [formVersion, setFormVersion] = useState(0);
   const act = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: object }) =>
       api<PartDetail>('POST', `/catalog/parts/${id}${path}`, body ?? {}),
@@ -344,7 +352,14 @@ export function PartPage() {
       <Card withBorder>
         <Title order={4}>{t('catalog.details')}</Title>
         {manage ? (
-          <DetailsForm key={JSON.stringify(p)} part={p} onSaved={update} />
+          <DetailsForm
+            key={`${p.id}:${String(formVersion)}`}
+            part={p}
+            onSaved={(saved) => {
+              update(saved);
+              setFormVersion((v) => v + 1);
+            }}
+          />
         ) : (
           <Text>
             {p.nameAr} {p.nameEn}
@@ -422,7 +437,9 @@ export function PartPage() {
           <Table.Tbody>
             {p.fitments.map((f) => (
               <Table.Tr key={f.id}>
-                <Table.Td>{f.path.join(' › ')}</Table.Td>
+                <Table.Td>
+                  <VehiclePath path={f.path} />
+                </Table.Td>
                 <Table.Td>{f.note}</Table.Td>
                 <Table.Td>
                   {manage && (

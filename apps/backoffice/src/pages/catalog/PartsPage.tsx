@@ -10,6 +10,7 @@ import {
   SegmentedControl,
   Select,
   Stack,
+  Switch,
   Table,
   Text,
   TextInput,
@@ -144,6 +145,8 @@ export function PartsPage() {
   const [search, setSearch] = useState('');
   const [q] = useDebouncedValue(search.trim(), 300);
   const [review, setReview] = useState<Review>('all');
+  // Archived parts are hidden everywhere else; this is the way back to them (to restore).
+  const [archived, setArchived] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkGrade, setBulkGrade] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -153,11 +156,12 @@ export function PartsPage() {
     const params = new URLSearchParams({ limit: String(PAGE) });
     if (q !== '') params.set('q', q);
     if (review !== 'all') params.set('needsReview', review);
+    if (archived) params.set('includeArchived', 'true');
     if (after !== undefined) params.set('after', after);
     return `/catalog/parts?${params.toString()}`;
   };
   const parts = useInfiniteQuery({
-    queryKey: [...catalogKeys.parts, q, review],
+    queryKey: [...catalogKeys.parts, q, review, archived],
     queryFn: ({ pageParam }) => api<PartSummary[]>('GET', query(pageParam)),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => (last.length < PAGE ? undefined : last.at(-1)?.sku),
@@ -217,6 +221,14 @@ export function PartsPage() {
             value: v,
             label: t(`catalog.needsReview.${v}`),
           }))}
+        />
+        <Switch
+          label={t('catalog.showArchived')}
+          checked={archived}
+          onChange={(e) => {
+            setArchived(e.currentTarget.checked);
+            setSelected(new Set());
+          }}
         />
       </Group>
       {manage && selected.size > 0 && (
