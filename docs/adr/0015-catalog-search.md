@@ -117,4 +117,5 @@ These changes replace steps 2–5 of "Interpreting a query" and refine the resul
     not archived (A → B archived → C offers C).
   - An archived part found by its number or SKU leads to that replacement as a result,
     with `matchedBy: 'replacement'` (BRIEF scenario 7).
-- Measured on 50,000 synthetic parts: p50 57 ms, p95 100 ms (target 200 ms).
+- Measured on 50,000 synthetic parts with prices in effect: p50 about 57 ms, p95 75 to
+  100 ms between runs (target 200 ms).
