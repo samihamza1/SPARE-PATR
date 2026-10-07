@@ -176,7 +176,10 @@ function CountInput({
         }}
         w={130}
       />
-      {save.isSuccess && <Badge color="green">{t('count.saved')}</Badge>}
+      {/* Saved = the server holds what is typed; it survives the line being refetched. */}
+      {line.counted !== null && value === line.counted && (
+        <Badge color="green">{t('count.saved')}</Badge>
+      )}
       <ErrorAlert error={save.error} />
     </Group>
   );
