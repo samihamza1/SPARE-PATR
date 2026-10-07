@@ -126,7 +126,27 @@
     "costCurrency": "Cost currency",
     "skuPrefix": "SKU prefix",
     "rowIds": "Rows",
-    "skipped": "Skipped"
+    "skipped": "Skipped",
+    "amount": "Amount",
+    "asOf": "As of",
+    "base": "Currency",
+    "batchId": "Import",
+    "costs": "Unit costs",
+    "counted": "Counted",
+    "documentId": "Document",
+    "excluded": "Excluded",
+    "fromLocationId": "From",
+    "fxRateId": "Exchange rate",
+    "lines": "Lines",
+    "locationId": "Location",
+    "partIds": "Parts",
+    "quantity": "Quantity",
+    "quote": "Quoted in",
+    "rate": "Rate",
+    "rateDate": "Date",
+    "scope": "What to count",
+    "toLocationId": "To",
+    "unitCost": "Unit cost"
   },
   "validation": {
     "invalid": "Invalid value",
@@ -171,6 +191,19 @@
     "currency": {
       "cash_increment_positive": "The cash increment must be greater than zero",
       "cash_increment_scale": "The cash increment has more decimals than the currency"
+    },
+    "count": {
+      "scope": "Choose the category or the parts that match what is counted"
+    },
+    "fx": {
+      "same_currency": "Choose two different currencies"
+    },
+    "stock": {
+      "cost_on_issue": "A unit cost is entered only for stock coming in",
+      "duplicate_part": "A part appears twice; enter it once",
+      "reason_direction": "This reason does not match the direction of the quantity",
+      "same_location": "Choose two different locations",
+      "zero_quantity": "The quantity cannot be zero"
     }
   },
   "errors": {

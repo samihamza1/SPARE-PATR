@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { uuidSchema, uuidV7Schema } from '../ids';
 import { DECIMAL_PATTERN, currencyCodeSchema, dec, decimalStringSchema } from '../money';
+import { requireChange } from '../patch';
 import { MAX_QUANTITY, quantitySchema } from './quantity';
 import { ADJUSTMENT_REASONS, STOCK_DOCUMENT_KINDS, stockMoveSchema } from './schemas';
 
@@ -134,25 +135,27 @@ export const createOpeningSchema = z.object({
   asOf: dateSchema.optional(),
 });
 
-export const updateOpeningSchema = z
-  .object({
-    locationId: uuidSchema,
-    asOf: dateSchema,
-    /** The go-live day's rate, when costs are in another currency. */
-    fxRateId: uuidSchema.nullable(),
-  })
-  .partial()
-  .refine((b) => Object.keys(b).length > 0, { message: 'request.empty' });
+export const updateOpeningSchema = requireChange(
+  z
+    .object({
+      locationId: uuidSchema,
+      asOf: dateSchema,
+      /** The go-live day's rate, when costs are in another currency. */
+      fxRateId: uuidSchema.nullable(),
+    })
+    .partial(),
+);
 
-export const updateOpeningLineSchema = z
-  .object({
-    quantity: quantitySchema,
-    /** Unit cost in the draft's cost currency; null clears an entered cost. */
-    unitCost: nonNegativeDecimalSchema.nullable(),
-    excluded: z.boolean(),
-  })
-  .partial()
-  .refine((b) => Object.keys(b).length > 0, { message: 'request.empty' });
+export const updateOpeningLineSchema = requireChange(
+  z
+    .object({
+      quantity: quantitySchema,
+      /** Unit cost in the draft's cost currency; null clears an entered cost. */
+      unitCost: nonNegativeDecimalSchema.nullable(),
+      excluded: z.boolean(),
+    })
+    .partial(),
+);
 
 export const openingLineSchema = z.object({
   partId: uuidSchema,

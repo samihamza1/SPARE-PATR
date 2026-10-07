@@ -126,7 +126,27 @@
     "costCurrency": "عملة التكلفة",
     "skuPrefix": "بادئة رمز الصنف",
     "rowIds": "الصفوف",
-    "skipped": "متخطّى"
+    "skipped": "متخطّى",
+    "amount": "المبلغ",
+    "asOf": "كما في",
+    "base": "العملة",
+    "batchId": "الاستيراد",
+    "costs": "تكاليف الوحدة",
+    "counted": "المعدود",
+    "documentId": "المستند",
+    "excluded": "مستبعد",
+    "fromLocationId": "من",
+    "fxRateId": "سعر الصرف",
+    "lines": "الأسطر",
+    "locationId": "الموقع",
+    "partIds": "القطع",
+    "quantity": "الكمية",
+    "quote": "مقابل",
+    "rate": "السعر",
+    "rateDate": "التاريخ",
+    "scope": "نطاق الجرد",
+    "toLocationId": "إلى",
+    "unitCost": "تكلفة الوحدة"
   },
   "validation": {
     "invalid": "قيمة غير صالحة",
@@ -171,6 +191,19 @@
     "currency": {
       "cash_increment_positive": "يجب أن تكون فئة النقد أكبر من صفر",
       "cash_increment_scale": "فئة النقد فيها خانات عشرية أكثر من العملة"
+    },
+    "count": {
+      "scope": "اختر الفئة أو القطع بما يناسب نطاق الجرد"
+    },
+    "fx": {
+      "same_currency": "اختر عملتين مختلفتين"
+    },
+    "stock": {
+      "cost_on_issue": "تُدخل تكلفة الوحدة للمخزون الداخل فقط",
+      "duplicate_part": "القطعة مكررة؛ أدخلها مرة واحدة",
+      "reason_direction": "السبب لا يناسب اتجاه الكمية",
+      "same_location": "اختر موقعين مختلفين",
+      "zero_quantity": "لا يمكن أن تكون الكمية صفراً"
     }
   },
   "errors": {
