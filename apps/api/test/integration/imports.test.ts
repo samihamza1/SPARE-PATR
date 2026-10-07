@@ -509,4 +509,54 @@ describe('catalog import', () => {
     const created = (await owner.get('/catalog/search?q=NEW-1')).json<SearchResult>();
     expect(created.results.map((r) => r.part.sku)).toEqual(['DM-100000000000000000000']);
   });
+
+  it('reads only the money settings for prices (ADR 0022)', async () => {
+    const other = await provisionShop(env);
+    const otherOwner = await loggedIn(env, other);
+    const list = (
+      await otherOwner.post('/catalog/price-lists', {
+        id: newId(),
+        name: 'Retail',
+        currency: 'AAA',
+        isDefault: true,
+      })
+    ).json<PriceList>();
+    const setSettings = (change: (s: Record<string, unknown>) => void) =>
+      withTenant(env.ownerDb, other.tenantId, async (trx) => {
+        const t = await trx.selectFrom('tenants').select('settings').executeTakeFirstOrThrow();
+        const settings = { ...(t.settings as Record<string, unknown>) };
+        change(settings);
+        await trx
+          .updateTable('tenants')
+          .set({ settings: JSON.stringify(settings) })
+          .execute();
+      });
+    const stageFor = () =>
+      otherOwner.post('/catalog/imports', {
+        id: newId(),
+        fileName: 'stock.xlsx',
+        contentBase64: file(),
+        sheet: 'LAND',
+        headerRow: 3,
+        mapping: {
+          ...mapping,
+          priceListId: list.id,
+          costCurrency: null,
+          columns: { ...mapping.columns, cost: undefined },
+        },
+      });
+    // A setting the import does not use is missing: prices still import.
+    await setSettings((s) => {
+      delete s.inventory;
+    });
+    const staged = await stageFor();
+    expect(staged.statusCode, staged.body).toBe(201);
+    // Without the rounding rule, no price is rounded: the shop must set it first.
+    await setSettings((s) => {
+      delete s.money;
+    });
+    const refused = await stageFor();
+    expect(refused.statusCode).toBe(409);
+    expect(errorCode(refused)).toBe('settings.incomplete');
+  });
 });
