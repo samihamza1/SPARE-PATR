@@ -87,3 +87,34 @@ diacritics. Part numbers vary in spacing and punctuation.
   normalisers, so online and offline search agree.
 - Changing a normalisation rule needs a migration (regenerated columns) and the same
   change in `packages/shared`, or the equivalence test fails.
+
+## Addendum (2026-10-07, Sprints 1–3 review)
+
+These changes replace steps 2–5 of "Interpreting a query" and refine the results.
+
+- **Part-number candidates** come from the query split on whitespace and punctuation, but
+  not on `-./_\`, so "04465-60320" stays one number next to any word.
+  - Adjacent number tokens are joined ("04465 60320" is 0446560320).
+  - Every contiguous join of a run is a candidate, longest first.
+  - Within a run, only the longest join that matched anything counts. So the full
+    number does not drag in every number that merely starts with 04465.
+  - The whole query is no longer a candidate when it holds words.
+- **Number lookups** order exact matches first, then shorter numbers, before their limit.
+  They also read archived parts, so their replacement can be offered (below).
+- **Vehicles before years**: vehicle n-grams are matched on every word first, so "peugeot
+  2008" names the model 2008.
+  - A 19xx/20xx word left over is a year. Two such words are a range ("2008-2015"), and
+    neither stays a required word.
+  - A year-like token is also matched as a number, but only exactly. A query that is
+    only a year-like token ("2015", a numeric SKU) is matched as a prefix too.
+- **The most specific vehicle**:
+  - A named vehicle that is an ancestor of another named one is dropped ("toyota land
+    cruiser" searches the Land Cruiser, not every Toyota).
+  - A vehicle chosen in the UI (`vehicleId`) restricts the typed one: the two scopes
+    are intersected, not joined.
+- **Replacements follow the chain**:
+  - The replacement offered is the last part of the active supersession chain that is
+    not archived (A → B archived → C offers C).
+  - An archived part found by its number or SKU leads to that replacement as a result,
+    with `matchedBy: 'replacement'` (BRIEF scenario 7).
+- Measured on 50,000 synthetic parts: p50 57 ms, p95 100 ms (target 200 ms).
