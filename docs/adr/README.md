@@ -44,5 +44,6 @@ Template:
 | [0020](0020-stock-ledger.md)                        | Stock ledger, concurrency and negative stock                |
 | [0021](0021-average-cost.md)                        | Average cost (AVCO)                                         |
 | [0022](0022-cost-visibility-and-module-settings.md) | Cost visibility and per-module settings                     |
+| [0023](0023-quantities-in-search.md)                | Quantities in search; alternatives in stock first           |
 | [0024](0024-opening-stock.md)                       | Opening stock from an imported sheet                        |
 | [0025](0025-adjustments-counts-and-review.md)       | Adjustments, transfers, counts and review                   |

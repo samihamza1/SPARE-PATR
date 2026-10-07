@@ -10,6 +10,7 @@ import type {
   PartDetail,
   PartStock,
   ReviewItem,
+  SearchResult,
   Role,
   StockCount,
   StockDocument,
@@ -535,5 +536,58 @@ describe('review items', () => {
       .json<ReviewItem[]>()
       .filter((i) => i.partId === part);
     expect(open).toEqual([]);
+  });
+});
+
+describe('search shows quantities (ADR 0023)', () => {
+  it('lists stock per location without cost, and offers alternatives in stock first', async () => {
+    const tag = newId().slice(-6);
+    const make = async (sku: string, grade: string) => {
+      const res = await owner.post('/catalog/parts', {
+        id: newId(),
+        sku: `${sku}-${tag}`,
+        nameEn: `Search stock ${sku}`,
+        qualityGrade: grade,
+      });
+      return res.json<PartDetail>().id;
+    };
+    const base = await make('BASE', 'oem');
+    const premium = await make('PRM', 'premium');
+    const economy = await make('ECO', 'economy');
+    const oemOut = await make('OEM', 'oem');
+    for (const other of [premium, economy, oemOut]) {
+      await owner.post(`/catalog/parts/${base}/interchange`, { partId: other });
+    }
+    const found = async (locationId: string, partId: string, quantity: number) => {
+      const res = await owner.post('/stock/adjustments', {
+        id: newId(),
+        locationId,
+        reason: 'found',
+        lines: [{ partId, quantity, unitCost: { amount: '5.00', currency: 'AAA' } }],
+      });
+      expect(res.statusCode, res.body).toBe(200);
+    };
+    await found(storeroom.id, premium, 3);
+    await found(mainShop.id, economy, 2);
+    await found(storeroom.id, economy, 1);
+
+    for (const client of [owner, cashier]) {
+      const res = await client.get(`/catalog/search?q=${encodeURIComponent(`BASE-${tag}`)}`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.body).not.toContain('"cost"');
+      const [top] = res.json<SearchResult>().results;
+      expect(top?.stock).toEqual({ total: 0, locations: [] });
+      // In stock first (premium before economy by grade), then the OEM part that is out.
+      expect(top?.alternatives.map((a) => [a.part.sku, a.stock.total])).toEqual([
+        [`PRM-${tag}`, 3],
+        [`ECO-${tag}`, 3],
+        [`OEM-${tag}`, 0],
+      ]);
+      const eco = top?.alternatives.find((a) => a.part.id === economy);
+      expect(eco?.stock.locations.sort((a, b) => a.quantity - b.quantity)).toEqual([
+        { locationId: storeroom.id, quantity: 1 },
+        { locationId: mainShop.id, quantity: 2 },
+      ]);
+    }
   });
 });

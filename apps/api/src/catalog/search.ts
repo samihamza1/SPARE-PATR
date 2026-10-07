@@ -12,6 +12,8 @@ import {
   toPartSummary,
 } from './mappers';
 
+type SearchStock = SearchResult['results'][number]['stock'];
+
 export interface SearchInput {
   q: string;
   vehicleId?: string | undefined;
@@ -456,18 +458,45 @@ export async function searchCatalog(
   const list = await defaultPriceList(trx, currency);
   const prices =
     list === undefined ? new Map<string, string>() : await currentPrices(trx, list.id, allIds, now);
+  // Quantities only, never cost: anyone signed in may see them (ADR 0022, ADR 0023).
+  const balances =
+    allIds.length === 0
+      ? []
+      : await trx
+          .selectFrom('stock_balances')
+          .select(['part_id', 'location_id', 'quantity'])
+          .where('part_id', 'in', allIds)
+          .where('quantity', '<>', 0)
+          .orderBy('location_id')
+          .execute();
+  const stockById = new Map<string, SearchStock>();
+  for (const b of balances) {
+    const s = stockById.get(b.part_id) ?? { total: 0, locations: [] };
+    s.total += b.quantity;
+    s.locations.push({ locationId: b.location_id, quantity: b.quantity });
+    stockById.set(b.part_id, s);
+  }
   /** Archived parts are never offered, as a result or as an alternative. */
   const hit = (id: string) => {
     const row = partById.get(id);
     if (row?.archived_at !== null) return null;
+    const stock = stockById.get(id) ?? { total: 0, locations: [] };
     const amount = prices.get(id);
-    return { part: toPartSummary(row), price: amount === undefined ? null : { amount, currency } };
+    return {
+      part: toPartSummary(row),
+      price: amount === undefined ? null : { amount, currency },
+      stock,
+    };
   };
-  // Best quality first, then cheapest, then SKU (scenario 1).
-  const byQualityThenPrice = (
-    a: { part: { qualityGrade: string | null; sku: string }; price: { amount: string } | null },
-    b: { part: { qualityGrade: string | null; sku: string }; price: { amount: string } | null },
-  ) =>
+  interface Ranked {
+    part: { qualityGrade: string | null; sku: string };
+    price: { amount: string } | null;
+    stock: SearchStock;
+  }
+  // What can be sold now first, then best quality, then cheapest, then SKU (scenario 1;
+  // product owner 2026-10-06, ADR 0023).
+  const byStockThenQualityThenPrice = (a: Ranked, b: Ranked) =>
+    Number(b.stock.total > 0) - Number(a.stock.total > 0) ||
     gradeRank(a.part.qualityGrade) - gradeRank(b.part.qualityGrade) ||
     (a.price === null ? 1 : 0) - (b.price === null ? 1 : 0) ||
     (a.price !== null && b.price !== null
@@ -500,7 +529,7 @@ export async function searchCatalog(
           return h === null ? null : { ...h, relation };
         })
         .filter((a) => a !== null)
-        .sort(byQualityThenPrice);
+        .sort(byStockThenQualityThenPrice);
       return [
         {
           ...base,
