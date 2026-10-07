@@ -625,6 +625,12 @@
       "discarded": "ملغى"
     },
     "createdAt": "بدأ في",
-    "fileTooLarge": "الملف أكبر من {{max}}. قسّمه إلى ملفات أصغر أو احذف الأوراق التي لا تحتاجها."
+    "fileTooLarge": "الملف أكبر من {{max}}. قسّمه إلى ملفات أصغر أو احذف الأوراق التي لا تحتاجها.",
+    "range": "الصفوف {{from, number}}–{{to, number}} من {{total, number}}",
+    "rangeOpen": "الصفوف {{from, number}}–{{to, number}}",
+    "previousRows": "الصفوف السابقة",
+    "nextRows": "الصفوف التالية",
+    "filterByDecision": "عرض الصفوف حسب النتيجة",
+    "filterByIssue": "عرض الصفوف حسب المشكلة"
   }
 }
