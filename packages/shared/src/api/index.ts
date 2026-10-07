@@ -30,6 +30,8 @@ export const ERROR_CODES = [
   'import.unreadable_file',
   'import.sheet_not_found',
   'import.too_many_rows',
+  // Past the reading limits (inflated size, memory or time).
+  'import.file_too_large',
   'import.already_applied',
   'import.not_editable',
   'server.error',

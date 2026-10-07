@@ -403,6 +403,7 @@ describe('catalog import', () => {
         name: 'rear',
         rowCount: 2,
         columnCount: 3,
+        tooLarge: false,
         rows: [
           ['number', 'name', 'price'],
           ['04465-60320', 'Pad, Rear', '12.5'],

@@ -83,7 +83,13 @@ export const importSheetPreviewSchema = z.object({
   columnCount: z.int(),
   /** The first rows as text, for choosing the header row and the columns. */
   rows: z.array(z.array(z.string().nullable())),
+  /**
+   * Past the row or column limits: listed with no rows (and counts of 0) instead of failing
+   * the whole file; staging it fails with import.too_many_rows.
+   */
+  tooLarge: z.boolean(),
 });
+export type ImportSheetPreview = z.infer<typeof importSheetPreviewSchema>;
 export const inspectImportResultSchema = z.object({
   sheets: z.array(importSheetPreviewSchema),
 });
