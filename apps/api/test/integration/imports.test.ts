@@ -11,6 +11,7 @@ import type {
   PriceList,
   SearchResult,
 } from '@autoparts/shared';
+import { sql } from 'kysely';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { XlsxCell } from '../xlsx';
 import { buildXlsx } from '../xlsx';
@@ -150,6 +151,17 @@ const stage = (content = file(), m: ImportMapping = mapping) =>
     mapping: m,
   });
 
+const priceAudits = (batchId: string) =>
+  withTenant(env.ownerDb, shop.tenantId, (trx) =>
+    trx
+      .selectFrom('audit_log')
+      .select(['entity_id', 'before', 'after', 'request_id'])
+      .where('action', '=', 'price.set')
+      .where(sql<boolean>`after->>'importBatchId' = ${batchId}`)
+      .orderBy('entity_id')
+      .execute(),
+  );
+
 const rowsOf = async (client: Client, batchId: string, query = '') =>
   (await client.get(`/catalog/imports/${batchId}/rows${query}`)).json<ImportRow[]>();
 
@@ -262,6 +274,25 @@ describe('catalog import', () => {
     expect((await rowsOf(owner, batch.id))[0]?.parsed.cost).toBe('48.3');
   });
 
+  it('needs prices.manage to stage, preview or apply a mapped price column', async () => {
+    const importer = await loggedIn(env, shop, 'importer', 'importer passphrase');
+    const staged = await importer.post('/catalog/imports', {
+      id: newId(),
+      fileName: 'stock.xlsx',
+      contentBase64: file(),
+      sheet: 'LAND',
+      headerRow: 3,
+      mapping,
+    });
+    expect(staged.statusCode).toBe(403);
+    expect(errorCode(staged)).toBe('auth.forbidden');
+    expect((await importer.post(`/catalog/imports/${batch.id}/analyse`)).statusCode).toBe(403);
+    expect((await importer.post(`/catalog/imports/${batch.id}/apply`)).statusCode).toBe(403);
+    expect((await owner.get(`/catalog/imports/${batch.id}`)).json<ImportBatchDetail>().status).toBe(
+      'draft',
+    );
+  });
+
   it('maps vehicle codes through aliases, lets the user skip rows, then previews', async () => {
     const alias = (body: object) =>
       owner.post('/catalog/vehicle-aliases', { id: newId(), ...body });
@@ -327,6 +358,13 @@ describe('catalog import', () => {
       trx.selectFrom('audit_log').select('after').where('action', '=', 'catalog.import').execute(),
     );
     expect(audits).toHaveLength(1);
+    // Every price set is audited like a manual change (invariant 7).
+    const prices = await priceAudits(batch.id);
+    expect(prices).toHaveLength(5);
+    const padPrice = prices.find((a) => a.entity_id === parts[1]?.id);
+    expect(padPrice?.before).toEqual({ priceListId: retail, price: null });
+    expect(padPrice?.after).toMatchObject({ priceListId: retail, price: '17.86' });
+    expect(padPrice?.request_id).not.toBeNull();
 
     const search = (
       await owner.get(`/catalog/search?q=${encodeURIComponent('pad lc')}`)
@@ -357,6 +395,13 @@ describe('catalog import', () => {
     ).json<ImportBatchDetail>();
     // Only the changed price is appended; fitments already present are not repeated.
     expect(applied.stats).toMatchObject({ pricesSet: 1, fitmentsAdded: 0 });
+    const changed = await priceAudits(next.id);
+    expect(changed.map((a) => [a.before, a.after])).toEqual([
+      [
+        { priceListId: retail, price: '17.86' },
+        expect.objectContaining({ priceListId: retail, price: '19.00' }),
+      ],
+    ]);
     const parts = (await owner.get('/catalog/parts?limit=50')).json<PartSummary[]>();
     // The skipped grease row of the first import is new this time.
     expect(parts.map((p) => p.sku)).toEqual([
@@ -383,8 +428,20 @@ describe('catalog import', () => {
     expect((await otherOwner.get(`/catalog/imports/${staged.id}`)).statusCode).toBe(404);
     expect((await otherOwner.post(`/catalog/imports/${staged.id}/apply`)).statusCode).toBe(404);
 
+    expect(await rowsOf(owner, staged.id)).not.toHaveLength(0);
     const discarded = await owner.post(`/catalog/imports/${staged.id}/discard`);
     expect(discarded.json<ImportBatchDetail>().status).toBe('discarded');
+    // The staged cells are blanked: a wrongly chosen sheet does not stay readable.
+    expect(await rowsOf(owner, staged.id)).toEqual([]);
+    const cells = await withTenant(env.ownerDb, shop.tenantId, (trx) =>
+      trx
+        .selectFrom('import_rows')
+        .select(['raw', 'parsed'])
+        .where('batch_id', '=', staged.id)
+        .execute(),
+    );
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((c) => JSON.stringify([c.raw, c.parsed]) === '[{},{}]')).toBe(true);
     expect(errorCode(await owner.post(`/catalog/imports/${staged.id}/apply`))).toBe(
       'import.not_editable',
     );
@@ -410,5 +467,46 @@ describe('catalog import', () => {
         ],
       },
     ]);
+  });
+
+  it('applies the same sheet once more for another price list', async () => {
+    const wholesale = (
+      await owner.post('/catalog/price-lists', { id: newId(), name: 'Wholesale', currency: 'AAA' })
+    ).json<PriceList>().id;
+    const res = await stage(file(), { ...mapping, priceListId: wholesale });
+    expect(res.statusCode, res.body).toBe(201);
+    const second = res.json<ImportBatchDetail>();
+    const applied = await owner.post(`/catalog/imports/${second.id}/apply`);
+    expect(applied.statusCode, applied.body).toBe(200);
+    const pricesSet = applied.json<ImportBatchDetail>().stats?.pricesSet;
+    expect(pricesSet).toBe(5);
+    expect(await priceAudits(second.id)).toHaveLength(5);
+    // The pair (sheet, price list) is applied once.
+    expect(errorCode(await stage(file(), { ...mapping, priceListId: wholesale }))).toBe(
+      'import.already_applied',
+    );
+  });
+
+  it('numbers new SKUs after the largest existing one, however long', async () => {
+    const big = await owner.post('/catalog/parts', {
+      id: newId(),
+      sku: 'DM-99999999999999999999',
+      nameEn: 'Long number',
+    });
+    expect(big.statusCode, big.body).toBe(201);
+    const rows: XlsxCell[][] = [HEADER, [n('1'), 'NEW-1', 'Wiper', null, null, null, null, null]];
+    const res = await owner.post('/catalog/imports', {
+      id: newId(),
+      fileName: 'wiper.xlsx',
+      contentBase64: buildXlsx({ LAND: rows }).toString('base64'),
+      sheet: 'LAND',
+      headerRow: 1,
+      mapping: { columns: { partNumber: 1, nameEn: 2 }, numberKind: 'oem', skuPrefix: 'DM' },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const applied = await owner.post(`/catalog/imports/${res.json<ImportBatchDetail>().id}/apply`);
+    expect(applied.statusCode, applied.body).toBe(200);
+    const created = (await owner.get('/catalog/search?q=NEW-1')).json<SearchResult>();
+    expect(created.results.map((r) => r.part.sku)).toEqual(['DM-100000000000000000000']);
   });
 });
