@@ -89,6 +89,9 @@ describe('shell and permissions', () => {
       ar.nav.parts,
       ar.nav.vehicles,
       ar.nav.catalogSetup,
+      ar.nav.stock,
+      ar.nav.locations,
+      ar.nav.fxRates,
       ar.nav.roles,
     ]);
   });
@@ -97,7 +100,7 @@ describe('shell and permissions', () => {
     new FakeApi().on('GET /auth/me', { status: 200, body: me(ALL) }).install();
     await renderApp('/');
     const nav = await screen.findByRole('navigation', { name: ar.nav.menu });
-    expect(within(nav).getAllByRole('link')).toHaveLength(11);
+    expect(within(nav).getAllByRole('link')).toHaveLength(19);
   });
 
   it('signs out to the login page, and the next user starts at home', async () => {
