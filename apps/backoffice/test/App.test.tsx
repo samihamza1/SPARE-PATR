@@ -1,8 +1,23 @@
+import type { ImportBatchDetail } from '@autoparts/shared';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ar from '../src/locales/ar.json';
 import en from '../src/locales/en.json';
-import { ALL, FakeApi, ROLES, USERS, me, renderApp } from './harness';
+import {
+  ALL,
+  CURRENCIES,
+  FakeApi,
+  ROLES,
+  SETTINGS,
+  USERS,
+  id,
+  me,
+  ok,
+  onPartPage,
+  part,
+  partDetail,
+  renderApp,
+} from './harness';
 
 afterEach(() => {
   cleanup();
@@ -232,55 +247,66 @@ describe('users page', () => {
 });
 
 describe('every page renders in both languages', () => {
-  const pages = ['/', '/users', '/roles', '/settings', '/devices', '/audit'];
+  const tree = partDetail(part(1, 'SKY-1', 'oem', 'فلتر'), {
+    fitments: [{ id: id(80), vehicleId: id(90), path: ['Car', 'Toyota'], note: null }],
+  });
+  const importBatch: ImportBatchDetail = {
+    id: id(60),
+    fileName: 'stock.xlsx',
+    sheet: 'LAND',
+    headerRow: 1,
+    status: 'previewed',
+    mapping: null,
+    stats: { rows: 1, byDecision: { create: 1 }, byIssue: { no_price: 1 } },
+    createdAt: '2026-10-05T08:00:00.000Z',
+    appliedAt: null,
+    vehicleCodes: [{ code: 'LC', codeNorm: 'lc', rows: 1, mapping: null }],
+  };
+  // Each page with what shows it has loaded: its heading, in the page's language.
+  const pages: [route: string, heading: (l: typeof ar) => string][] = [
+    ['/', (l) => l.home.welcome.replace('{{name}}', 'سامي')],
+    ['/users', (l) => l.users.title],
+    ['/roles', (l) => l.roles.title],
+    ['/settings', (l) => l.settings.title],
+    ['/devices', (l) => l.devices.title],
+    ['/audit', (l) => l.audit.title],
+    ['/search', (l) => l.search.title],
+    ['/catalog/parts', (l) => l.catalog.partsTitle],
+    [`/catalog/parts/${tree.id}`, () => 'SKY-1'],
+    ['/catalog/vehicles', (l) => l.vehicles.title],
+    ['/catalog/setup', (l) => l.setup.title],
+    ['/catalog/imports', (l) => l.import.title],
+    [`/catalog/imports/${importBatch.id}`, () => 'stock.xlsx'],
+  ];
+  // Any "namespace.key" text is a leaked translation key.
+  const leakedKey = new RegExp(`\\b(${Object.keys(ar).join('|')})\\.[a-zA-Z_]+`);
+
   for (const lng of ['ar', 'en'] as const) {
-    it.each(pages)(`${lng} %s`, async (route) => {
-      new FakeApi()
-        .on('GET /auth/me', { status: 200, body: me(ALL) })
-        .on('GET /users', { status: 200, body: USERS })
-        .on('GET /roles', { status: 200, body: ROLES })
-        .on('GET /settings', {
-          status: 200,
-          body: {
-            name: 'Sky Motors',
-            defaultLocale: 'ar',
-            timezone: 'UTC',
-            functionalCurrency: 'AAA',
-            settings: {
-              session: { idleMinutes: 30, absoluteHours: 12 },
-              security: { maxFailedLogins: 5, lockoutMinutes: 15 },
-              money: { roundingMode: 'HALF_EVEN' },
-              inventory: { allowNegativeStock: false },
-            },
-          },
-        })
-        .on('GET /currencies', {
-          status: 200,
-          body: [
-            {
-              id: '01900000-0000-7000-8000-0000000000c1',
-              code: 'AAA',
-              minorUnits: 2,
-              cashIncrement: null,
-              isActive: true,
-              sortOrder: 0,
-              isFunctional: true,
-            },
-          ],
-        })
-        .on('GET /devices', { status: 200, body: [] })
-        .on('GET /audit-log', { status: 200, body: [] })
+    it.each(pages)(`${lng} %s`, async (route, heading) => {
+      onPartPage(new FakeApi(), tree)
+        .on('GET /auth/me', ok(me(ALL)))
+        .on('GET /users', ok(USERS))
+        .on('GET /roles', ok(ROLES))
+        .on('GET /settings', ok(SETTINGS))
+        .on('GET /currencies', ok(CURRENCIES))
+        .on('GET /devices', ok([]))
+        .on('GET /audit-log', ok([]))
+        .on('GET /catalog/parts', ok([part(1, 'SKY-1', 'oem', 'فلتر')]))
+        .on('GET /catalog/vehicles', ok([]))
+        .on('GET /catalog/vehicle-aliases', ok([]))
+        .on('GET /catalog/imports', ok([importBatch]))
+        .on(`GET /catalog/imports/${importBatch.id}`, ok(importBatch))
+        .on(`GET /catalog/imports/${importBatch.id}/rows`, ok([]))
         .install();
       const { container } = await renderApp(route, lng);
-      await screen.findByRole('navigation');
-      expect(document.documentElement.dir).toBe(lng === 'ar' ? 'rtl' : 'ltr');
+      await screen.findByRole('heading', { name: heading(lng === 'ar' ? ar : en) });
+      // Lazy pages and their data have settled: no spinner left.
       await waitFor(() => {
-        expect(screen.queryByRole('alert')).toBeNull();
+        expect(container.querySelector('.mantine-Loader-root')).toBeNull();
       });
-      // No raw i18n keys leaked into the page.
-      expect(container.ownerDocument.body.textContent).not.toMatch(
-        /\b(nav|auth|users|roles|settings|devices|audit|common|errors)\.[a-z_]+/,
-      );
+      expect(document.documentElement.dir).toBe(lng === 'ar' ? 'rtl' : 'ltr');
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(container.ownerDocument.body.textContent).not.toMatch(leakedKey);
     });
   }
 });
