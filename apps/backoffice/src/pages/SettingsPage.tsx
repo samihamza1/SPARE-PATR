@@ -324,7 +324,7 @@ function Currencies() {
                   </Group>
                 </Table.Td>
                 <Table.Td>{c.minorUnits}</Table.Td>
-                <Table.Td dir="ltr">{c.cashIncrement ?? '—'}</Table.Td>
+                <Table.Td dir="ltr">{c.cashIncrement ?? t('common.none')}</Table.Td>
                 <Table.Td>
                   <Switch
                     aria-label={`${c.code} ${t('currencies.active')}`}

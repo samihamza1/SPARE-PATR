@@ -20,14 +20,16 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import { useAuth } from '../../auth';
-import { VehiclePicker, catalogKeys, categoryName, useCategories } from '../../catalog/common';
+import {
+  RemovableBadge,
+  VehiclePicker,
+  catalogKeys,
+  categoryName,
+  useCategories,
+  useYearRange,
+} from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { Form, useRequired } from '../../forms';
-
-const years = (v: Vehicle) =>
-  v.yearFrom === null && v.yearTo === null
-    ? ''
-    : `${v.yearFrom === null ? '' : String(v.yearFrom)}–${v.yearTo === null ? '' : String(v.yearTo)}`;
 
 function AddVehicle({ parent, onAdded }: { parent: Vehicle; onAdded: () => void }) {
   const { t } = useTranslation();
@@ -68,7 +70,7 @@ function AddVehicle({ parent, onAdded }: { parent: Vehicle; onAdded: () => void 
       >
         <Group align="flex-end">
           <TextInput
-            label={`${t('fields.name')} (${t(`catalog.level.${level}`)})`}
+            label={t('vehicles.nameOfLevel', { level: t(`catalog.level.${level}`) })}
             required
             dir="ltr"
             value={name}
@@ -242,15 +244,13 @@ function Aliases() {
               (vehicle === null ? (
                 <VehiclePicker onPick={setVehicle} error={required.errors.vehicle} />
               ) : (
-                <Badge
+                <RemovableBadge
                   size="lg"
-                  variant="light"
-                  onClick={() => {
+                  label={vehicle.name}
+                  onRemove={() => {
                     setVehicle(null);
                   }}
-                >
-                  {vehicle.name} ×
-                </Badge>
+                />
               ))}
             {target === 'category' && (
               <Select
@@ -278,6 +278,7 @@ function Aliases() {
 
 export function VehiclesPage() {
   const { t } = useTranslation();
+  const yearRange = useYearRange();
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const [path, setPath] = useState<Vehicle[]>([]);
@@ -322,19 +323,28 @@ export function VehiclesPage() {
           {children.data?.map((v) => (
             <Table.Tr key={v.id}>
               <Table.Td>
-                <Anchor
-                  component="button"
-                  onClick={() => {
-                    setPath([...path, v]);
-                  }}
-                >
-                  {v.name}
-                </Anchor>{' '}
-                {v.nameAr !== null && <Text span>/ {v.nameAr}</Text>}
+                <Group gap="xs">
+                  <Anchor
+                    component="button"
+                    onClick={() => {
+                      setPath([...path, v]);
+                    }}
+                  >
+                    {v.name}
+                  </Anchor>
+                  {v.nameAr !== null && (
+                    <Text span c="dimmed">
+                      {v.nameAr}
+                    </Text>
+                  )}
+                </Group>
               </Table.Td>
               <Table.Td>{t(`catalog.level.${v.level}`)}</Table.Td>
               <Table.Td dir="ltr">
-                {years(v)} {v.engineCode ?? ''}
+                <Group gap="xs">
+                  <Text span>{yearRange(v)}</Text>
+                  <Text span>{v.engineCode}</Text>
+                </Group>
               </Table.Td>
               <Table.Td>
                 <Badge variant="light" color={v.isLocal ? 'grape' : 'gray'}>

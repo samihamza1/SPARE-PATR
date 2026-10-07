@@ -40,7 +40,8 @@
     "notFound": "Page not found",
     "forbiddenHint": "Ask the shop administrator for the permission you need.",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "removeNamed": "Remove {{name}}"
   },
   "fields": {
     "username": "Username",
@@ -378,7 +379,11 @@
         "import_stage": "Import file checked",
         "import_discard": "Import discarded"
       }
-    }
+    },
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "reasonText": "Reason: {{reason}}"
   },
   "search": {
     "title": "Find a part",
@@ -487,7 +492,19 @@
     },
     "noPrice": "No price",
     "chooseVehicle": "Search vehicles",
-    "back": "Back to parts"
+    "back": "Back to parts",
+    "vehicleNames": "{{name}} / {{nameAr}}",
+    "vehicleOption": "{{names}} ({{level}})",
+    "vehicleOptionYears": "{{names}} ({{level}} {{years}})",
+    "yearRange": "{{from}}–{{to}}",
+    "yearRangeFrom": "{{from}} onwards",
+    "yearRangeTo": "until {{to}}",
+    "partOption": "{{sku}} — {{name}}",
+    "priceListOption": "{{name}} ({{currency}})",
+    "pathSeparator": "›",
+    "vehiclePath": "Vehicle path",
+    "archiveConfirm": "Archive this part? It disappears from lists and sales search until it is restored.",
+    "showArchived": "Show archived parts"
   },
   "vehicles": {
     "title": "Vehicles",
@@ -521,7 +538,8 @@
       "ignore": "Ignore"
     },
     "mapsTo": "Means",
-    "addAlias": "Add word"
+    "addAlias": "Add word",
+    "nameOfLevel": "Name ({{level}})"
   },
   "setup": {
     "title": "Catalog setup",
@@ -553,7 +571,7 @@
     "sheet": "Sheet",
     "rows": "{{count}} rows",
     "headerRow": "Header row",
-    "headerHint": "Click the row that holds the column titles; data starts below it.",
+    "headerHint": "Click the row that holds the column titles, or enter its number; data starts below it.",
     "row": "Row",
     "field": {
       "sku": "SKU",
@@ -631,6 +649,13 @@
     "previousRows": "Previous rows",
     "nextRows": "Next rows",
     "filterByDecision": "Show rows by result",
-    "filterByIssue": "Show rows by problem"
+    "filterByIssue": "Show rows by problem",
+    "columnOption": "{{letter}} — {{title}}",
+    "sheetOption": "{{name}} ({{rows}})",
+    "sheetTooLarge": "{{name}} (too large: over {{rows, number}} rows or {{columns, number}} columns)",
+    "noReadableSheet": "Every sheet in this file is too large (over {{rows, number}} rows or {{columns, number}} columns). Split it into smaller sheets.",
+    "appliedSummary": "Prices set: {{prices, number}} · Vehicle links added: {{fitments, number}}",
+    "mapCodeTitle": "Map code {{code}}",
+    "mapSaved": "Already saved: {{names}}. Saving again adds only the rest."
   }
 }

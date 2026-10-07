@@ -7,7 +7,7 @@ import type {
   QualityGrade,
   Vehicle,
 } from '@autoparts/shared';
-import { Badge, Select, Text } from '@mantine/core';
+import { Badge, Breadcrumbs, CloseButton, Select, Text } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -77,6 +77,81 @@ export const partName = (p: Pick<PartSummary, 'nameAr' | 'nameEn'>, lang: string
 export const categoryName = (c: Category, lang: string): string =>
   (lang === 'ar' ? (c.nameAr ?? c.nameEn) : (c.nameEn ?? c.nameAr)) ?? '';
 
+/** A vehicle's years as a range in the user's language; empty when neither year is known. */
+export function useYearRange() {
+  const { t } = useTranslation();
+  return (v: Pick<Vehicle, 'yearFrom' | 'yearTo'>): string => {
+    if (v.yearFrom === null) {
+      return v.yearTo === null ? '' : t('catalog.yearRangeTo', { to: String(v.yearTo) });
+    }
+    return v.yearTo === null
+      ? t('catalog.yearRangeFrom', { from: String(v.yearFrom) })
+      : t('catalog.yearRange', { from: String(v.yearFrom), to: String(v.yearTo) });
+  };
+}
+
+/** A vehicle's names, level and years, as the translation orders them. */
+export function useVehicleLabel() {
+  const { t } = useTranslation();
+  const yearRange = useYearRange();
+  return (v: Vehicle): string => {
+    const names =
+      v.nameAr === null ? v.name : t('catalog.vehicleNames', { name: v.name, nameAr: v.nameAr });
+    const level = t(`catalog.level.${v.level}`);
+    const years = yearRange(v);
+    return years === ''
+      ? t('catalog.vehicleOption', { names, level })
+      : t('catalog.vehicleOptionYears', { names, level, years });
+  };
+}
+
+/** A vehicle's place in the tree, root first, in the reading direction of the page. */
+export function VehiclePath({ path }: { path: readonly string[] }) {
+  const { t } = useTranslation();
+  return (
+    <Breadcrumbs
+      aria-label={t('catalog.vehiclePath')}
+      separator={t('catalog.pathSeparator')}
+      separatorMargin={6}
+    >
+      {path.map((name, i) => (
+        <Text key={i} span size="sm">
+          {name}
+        </Text>
+      ))}
+    </Breadcrumbs>
+  );
+}
+
+/** A picked item shown as a badge, removed with a real, labelled button. */
+export function RemovableBadge({
+  label,
+  onRemove,
+  size,
+}: {
+  label: string;
+  onRemove: () => void;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const { t } = useTranslation();
+  return (
+    <Badge
+      variant="light"
+      size={size ?? 'md'}
+      rightSection={
+        <CloseButton
+          size="xs"
+          variant="transparent"
+          aria-label={t('common.removeNamed', { name: label })}
+          onClick={onRemove}
+        />
+      }
+    >
+      {label}
+    </Badge>
+  );
+}
+
 /** Picks a vehicle (shared or this shop's) by searching its name, Arabic name or engine code. */
 export function VehiclePicker({
   label,
@@ -88,6 +163,7 @@ export function VehiclePicker({
   onPick: (vehicle: Vehicle) => void;
 }) {
   const { t } = useTranslation();
+  const vehicleLabel = useVehicleLabel();
   const [search, setSearch] = useState('');
   const [q] = useDebouncedValue(search.trim(), 250);
   const found = useQuery({
@@ -106,14 +182,7 @@ export function VehiclePicker({
       onSearchChange={setSearch}
       filter={({ options }) => options}
       value={null}
-      data={(found.data ?? []).map((v) => ({
-        value: v.id,
-        label: `${v.name}${v.nameAr === null ? '' : ` / ${v.nameAr}`} (${t(`catalog.level.${v.level}`)}${
-          v.yearFrom === null
-            ? ''
-            : ` ${String(v.yearFrom)}–${v.yearTo === null ? '' : String(v.yearTo)}`
-        })`,
-      }))}
+      data={(found.data ?? []).map((v) => ({ value: v.id, label: vehicleLabel(v) }))}
       onChange={(id) => {
         const v = id === null ? undefined : byId.get(id);
         if (v !== undefined) {
@@ -154,7 +223,10 @@ export function PartPicker({
       onSearchChange={setSearch}
       filter={({ options }) => options}
       value={null}
-      data={parts.map((p) => ({ value: p.id, label: `${p.sku} — ${partName(p, i18n.language)}` }))}
+      data={parts.map((p) => ({
+        value: p.id,
+        label: t('catalog.partOption', { sku: p.sku, name: partName(p, i18n.language) }),
+      }))}
       onChange={(id) => {
         const p = id === null ? undefined : byId.get(id);
         if (p !== undefined) {

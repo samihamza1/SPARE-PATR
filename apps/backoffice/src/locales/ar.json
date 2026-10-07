@@ -40,7 +40,8 @@
     "notFound": "الصفحة غير موجودة",
     "forbiddenHint": "اطلب من مدير المحل منحك الصلاحية المطلوبة.",
     "copy": "نسخ",
-    "copied": "تم النسخ"
+    "copied": "تم النسخ",
+    "removeNamed": "إزالة {{name}}"
   },
   "fields": {
     "username": "اسم المستخدم",
@@ -378,7 +379,11 @@
         "import_stage": "فحص ملف استيراد",
         "import_discard": "إلغاء استيراد"
       }
-    }
+    },
+    "field": "الحقل",
+    "before": "قبل",
+    "after": "بعد",
+    "reasonText": "السبب: {{reason}}"
   },
   "search": {
     "title": "البحث عن قطعة",
@@ -487,7 +492,19 @@
     },
     "noPrice": "بلا سعر",
     "chooseVehicle": "ابحث عن سيارة",
-    "back": "العودة إلى القطع"
+    "back": "العودة إلى القطع",
+    "vehicleNames": "{{name}} / {{nameAr}}",
+    "vehicleOption": "{{names}} ({{level}})",
+    "vehicleOptionYears": "{{names}} ({{level}} {{years}})",
+    "yearRange": "{{from}}–{{to}}",
+    "yearRangeFrom": "من {{from}}",
+    "yearRangeTo": "حتى {{to}}",
+    "partOption": "{{sku}} — {{name}}",
+    "priceListOption": "{{name}} ({{currency}})",
+    "pathSeparator": "›",
+    "vehiclePath": "تسلسل السيارة",
+    "archiveConfirm": "أرشفة هذه القطعة؟ ستختفي من القوائم ومن بحث البيع حتى تُستعاد.",
+    "showArchived": "عرض القطع المؤرشفة"
   },
   "vehicles": {
     "title": "السيارات",
@@ -521,7 +538,8 @@
       "ignore": "تجاهل"
     },
     "mapsTo": "تعني",
-    "addAlias": "إضافة كلمة"
+    "addAlias": "إضافة كلمة",
+    "nameOfLevel": "الاسم ({{level}})"
   },
   "setup": {
     "title": "إعداد الكتالوج",
@@ -553,7 +571,7 @@
     "sheet": "الورقة",
     "rows": "{{count}} صف",
     "headerRow": "صف العناوين",
-    "headerHint": "اضغط على الصف الذي يحوي عناوين الأعمدة؛ البيانات تبدأ تحته.",
+    "headerHint": "اضغط على الصف الذي يحوي عناوين الأعمدة أو اكتب رقمه؛ البيانات تبدأ تحته.",
     "row": "الصف",
     "field": {
       "sku": "رمز الصنف",
@@ -631,6 +649,13 @@
     "previousRows": "الصفوف السابقة",
     "nextRows": "الصفوف التالية",
     "filterByDecision": "عرض الصفوف حسب النتيجة",
-    "filterByIssue": "عرض الصفوف حسب المشكلة"
+    "filterByIssue": "عرض الصفوف حسب المشكلة",
+    "columnOption": "{{letter}} — {{title}}",
+    "sheetOption": "{{name}} ({{rows}})",
+    "sheetTooLarge": "{{name}} (كبيرة جداً: أكثر من {{rows, number}} صف أو {{columns, number}} عمود)",
+    "noReadableSheet": "كل أوراق هذا الملف كبيرة جداً (أكثر من {{rows, number}} صف أو {{columns, number}} عمود). قسّمها إلى أوراق أصغر.",
+    "appliedSummary": "أسعار مسجّلة: {{prices, number}} · روابط سيارات مضافة: {{fitments, number}}",
+    "mapCodeTitle": "ربط الرمز {{code}}",
+    "mapSaved": "حُفظ من قبل: {{names}}. الحفظ مرة أخرى يضيف الباقي فقط."
   }
 }
