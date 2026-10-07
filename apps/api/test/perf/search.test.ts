@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { SyntheticPart } from '../../src/catalog/synthetic';
 import { seedSyntheticCatalog } from '../../src/catalog/synthetic';
 import type { Client } from '../integration/harness';
-import { loggedIn, provisionShop, setupEnv } from '../integration/harness';
+import { MINUTE, loggedIn, provisionShop, setupEnv } from '../integration/harness';
 
 /**
  * p95 of GET /catalog/search under 200 ms on 50,000 synthetic parts (Sprint 3 target),
@@ -26,6 +26,8 @@ beforeAll(async () => {
     parts: PARTS,
     currency: 'AAA',
     minorUnits: 2,
+    // In effect before the test clock, or no result would ever carry a price.
+    effectiveAt: new Date(env.clock.now.getTime() - MINUTE),
   }));
   await sql`ANALYZE parts, part_numbers, fitments, part_prices, vehicles, interchange_members`.execute(
     env.ownerDb,
@@ -66,8 +68,10 @@ describe('catalog search performance', () => {
         own.push(performance.now() - started);
         expect(res.statusCode).toBe(200);
         if (kind === 'exact number') {
-          const ids = res.json<SearchResult>().results.map((r) => r.part.id);
-          expect(ids).toContain(part.id);
+          const hit = res.json<SearchResult>().results.find((r) => r.part.id === part.id);
+          expect(hit).toBeDefined();
+          // Prices are part of what is measured (lookup, formatting, ordering).
+          expect(hit?.price).not.toBeNull();
         }
       }
       own.sort((a, b) => a - b);
