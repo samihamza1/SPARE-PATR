@@ -212,7 +212,11 @@ function gate(): { promise: Promise<void>; open: () => void } {
 
 /** 'blocked' when the promise is still pending after a while, else how it settled. */
 async function stateAfterWait(p: Promise<unknown>): Promise<string> {
-  const pending = new Promise<string>((resolve) => setTimeout(() => resolve('blocked'), 300));
+  const pending = new Promise<string>((resolve) =>
+    setTimeout(() => {
+      resolve('blocked');
+    }, 300),
+  );
   return Promise.race([p.then(() => 'settled'), pending]);
 }
 
