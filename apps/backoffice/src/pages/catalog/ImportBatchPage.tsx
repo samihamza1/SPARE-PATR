@@ -7,6 +7,7 @@ import type {
   Vehicle,
 } from '@autoparts/shared';
 import {
+  Alert,
   Anchor,
   Badge,
   Button,
@@ -226,6 +227,9 @@ export function ImportBatchPage() {
   if (batch.data === undefined) return <ErrorAlert error={batch.error} />;
   const b = batch.data;
   const editable = b.status === 'draft' || b.status === 'previewed';
+  // An import that sets selling prices is analysed and applied with prices.manage too.
+  const setsPrices = b.mapping?.columns.sellPrice !== undefined;
+  const mayRun = can('catalog.import') && (!setsPrices || can('prices.manage'));
   const importing = (b.stats?.rows ?? 0) - (b.stats?.byDecision.skip ?? 0);
   // How many rows the current filter matches, when the summary says (not for two filters).
   const total =
@@ -250,9 +254,7 @@ export function ImportBatchPage() {
         <Title order={2} dir="ltr">
           {b.fileName}
         </Title>
-        <Text>
-          {t('import.sheet')}: {b.sheet}
-        </Text>
+        <Text>{t('common.labelValue', { label: t('import.sheet'), value: b.sheet })}</Text>
         <Badge size="lg" variant="light">
           {t(`import.status.${b.status}`)}
         </Badge>
@@ -262,7 +264,9 @@ export function ImportBatchPage() {
       <Card withBorder>
         <Title order={4}>{t('import.summary')}</Title>
         <Group gap="xs" mt="xs" role="group" aria-label={t('import.filterByDecision')}>
-          <Text>{t('import.rows', { count: b.stats?.rows ?? 0 })}:</Text>
+          <Text>
+            {t('common.label', { label: t('import.rows', { count: b.stats?.rows ?? 0 }) })}
+          </Text>
           {IMPORT_DECISIONS.map((d) =>
             (b.stats?.byDecision[d] ?? 0) === 0 ? null : (
               <Badge
@@ -277,7 +281,10 @@ export function ImportBatchPage() {
                   filter({ issue, decision: decision === d ? null : d });
                 }}
               >
-                {t(`import.decision.${d}`)}: {b.stats?.byDecision[d]}
+                {t('common.labelValue', {
+                  label: t(`import.decision.${d}`),
+                  value: b.stats?.byDecision[d],
+                })}
               </Badge>
             ),
           )}
@@ -296,7 +303,7 @@ export function ImportBatchPage() {
                 filter({ issue: issue === i ? null : (i as ImportIssue), decision });
               }}
             >
-              {t(`import.issue.${i}`)}: {count}
+              {t('common.labelValue', { label: t(`import.issue.${i}`), value: count })}
             </Badge>
           ))}
         </Group>
@@ -313,7 +320,12 @@ export function ImportBatchPage() {
             </Anchor>
           </Group>
         )}
-        {editable && can('catalog.import') && (
+        {editable && can('catalog.import') && !mayRun && (
+          <Alert color="yellow" role="status" mt="md">
+            {t('import.needsPrices')}
+          </Alert>
+        )}
+        {editable && mayRun && (
           <Group mt="md">
             <Button
               variant="light"
@@ -373,11 +385,14 @@ export function ImportBatchPage() {
                       </Badge>
                     ) : (
                       <Text size="sm">
-                        {t(`vehicles.target.${c.mapping.target}`)}
-                        {c.mapping.vehicles.length > 0 &&
-                          `: ${new Intl.ListFormat(i18n.language).format(
-                            c.mapping.vehicles.map((v) => v.name),
-                          )}`}
+                        {c.mapping.vehicles.length > 0
+                          ? t('common.labelValue', {
+                              label: t(`vehicles.target.${c.mapping.target}`),
+                              value: new Intl.ListFormat(i18n.language).format(
+                                c.mapping.vehicles.map((v) => v.name),
+                              ),
+                            })
+                          : t(`vehicles.target.${c.mapping.target}`)}
                       </Text>
                     )}
                   </Table.Td>
@@ -525,7 +540,7 @@ export function ImportBatchPage() {
           }}
           onSaved={() => {
             setMapping(null);
-            post.mutate({ path: '/analyse' });
+            if (mayRun) post.mutate({ path: '/analyse' });
           }}
         />
       )}

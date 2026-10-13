@@ -155,6 +155,26 @@ describe('audit log', () => {
   });
 });
 
+describe('following a link to another part', () => {
+  it('starts that part afresh: nothing typed for the first part stays', async () => {
+    const replacement = part(2, 'SKY-2', null, 'فلتر جديد');
+    const first = partDetail(part(1, 'SKY-1', null, 'فلتر'), { supersededBy: replacement });
+    const api = new FakeApi().on('GET /auth/me', ok(me(ALL)));
+    onPartPage(onPartPage(api, first), partDetail(replacement));
+    api.install();
+    await renderApp(`/catalog/parts/${first.id}`);
+    const number = await screen.findByLabelText(labelled(ar.catalog.number));
+    fireEvent.change(number, { target: { value: 'TYPED-123' } });
+    fireEvent.click(screen.getByRole('link', { name: 'SKY-2' }));
+    await waitFor(() => {
+      expect(api.calls.some((c) => c.path === `/catalog/parts/${replacement.id}`)).toBe(true);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText<HTMLInputElement>(labelled(ar.catalog.number)).value).toBe('');
+    });
+  });
+});
+
 describe('replacement', () => {
   it('removes a wrong replacement, with the vehicles it copied, after asking', async () => {
     const replacement = part(2, 'SKY-2', null, 'فلتر جديد');

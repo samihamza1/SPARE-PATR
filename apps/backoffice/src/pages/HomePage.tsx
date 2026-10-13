@@ -12,13 +12,15 @@ export function HomePage() {
       <Paper withBorder p="md">
         <Stack gap="xs">
           <Text>
-            {t('home.shop')}: <b>{me.tenant.name}</b> ({me.tenant.slug})
+            {t('common.label', { label: t('home.shop') })}{' '}
+            <b>{t('home.shopName', { name: me.tenant.name, slug: me.tenant.slug })}</b>
           </Text>
           <Text>
-            {t('home.functionalCurrency')}: <b>{me.tenant.functionalCurrency}</b>
+            {t('common.label', { label: t('home.functionalCurrency') })}{' '}
+            <b>{me.tenant.functionalCurrency}</b>
           </Text>
           <Group gap="xs">
-            <Text>{t('home.permissions')}:</Text>
+            <Text>{t('common.label', { label: t('home.permissions') })}</Text>
             {me.permissions.length === 0 ? (
               <Text c="dimmed">{t('common.none')}</Text>
             ) : (

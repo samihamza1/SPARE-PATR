@@ -2,7 +2,9 @@ import type {
   CountLine,
   CurrentFxRates,
   OpeningDraft,
+  OpeningLine,
   PartStock,
+  ReviewItem,
   StockCount,
 } from '@autoparts/shared';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
@@ -13,6 +15,7 @@ import {
   FakeApi,
   LOCATIONS,
   id,
+  labelled,
   me,
   ok,
   onPartPage,
@@ -194,6 +197,80 @@ describe('opening stock (ADR 0024)', () => {
     const post = await show({ ready: 5, needs_cost: 0, needs_quantity: 0, excluded: 2 });
     expect(post.hasAttribute('disabled')).toBe(false);
   });
+
+  const counts = { ready: 0, needs_cost: 150, needs_quantity: 0, excluded: 0 };
+  const line = (n: number): OpeningLine => ({
+    partId: id(1000 + n),
+    sku: `SKU-${String(n).padStart(4, '0')}`,
+    nameAr: null,
+    nameEn: `Part ${String(n)}`,
+    rows: 1,
+    fileQuantity: '1',
+    quantity: 1,
+    amount: null,
+    unitCost: null,
+    costSource: null,
+    suggestedUnitCost: null,
+    status: 'needs_cost',
+    exclusion: null,
+  });
+  const fake = () =>
+    new FakeApi()
+      .on('GET /auth/me', ok(me(['stock.opening', 'cost.view'])))
+      .on('GET /locations', ok(LOCATIONS))
+      .on('GET /currencies', ok(CURRENCIES))
+      .on(
+        'GET /fx-rates/current',
+        ok({ businessDate: '2026-10-07', functionalCurrency: 'AAA', rates: [] }),
+      )
+      .on(`GET /stock/opening/${id(71)}`, ok(draft(counts)));
+
+  it('saves the go-live date once it is fully entered, not at every keystroke', async () => {
+    const api = fake()
+      .on(`GET /stock/opening/${id(71)}/lines`, ok([]))
+      .on(`PATCH /stock/opening/${id(71)}`, (body) =>
+        ok({ ...draft(counts), ...(body as object) }),
+      );
+    api.install();
+    await renderApp(`/inventory/opening/${id(71)}`);
+    const date = await screen.findByLabelText(ar.opening.asOf);
+    // A date input reports each typed digit of the year as a whole date.
+    for (const value of ['0002-10-05', '0020-10-05', '0202-10-05', '2026-10-05']) {
+      fireEvent.change(date, { target: { value } });
+    }
+    expect(api.calls.filter((c) => c.method === 'PATCH')).toEqual([]);
+    fireEvent.blur(date);
+    await waitFor(() => {
+      expect(api.calls.filter((c) => c.method === 'PATCH').map((c) => c.body)).toEqual([
+        { asOf: '2026-10-05' },
+      ]);
+    });
+  });
+
+  it('pages through the lines of a tab, by SKU', async () => {
+    const api = fake().on(`GET /stock/opening/${id(71)}/lines`, (_body, query) =>
+      ok(query.has('after') ? [line(101)] : Array.from({ length: 100 }, (_, n) => line(n + 1))),
+    );
+    api.install();
+    await renderApp(`/inventory/opening/${id(71)}`);
+    await screen.findByText('SKU-0100');
+    fireEvent.click(screen.getByRole('button', { name: ar.common.next }));
+    await screen.findByText('SKU-0101');
+    const pages = api.calls.filter((c) => c.path === `/stock/opening/${id(71)}/lines`);
+    expect(new URLSearchParams(pages.at(-1)?.query).get('after')).toBe('SKU-0100');
+    fireEvent.click(screen.getByRole('button', { name: ar.common.previous }));
+    await screen.findByText('SKU-0001');
+  });
+
+  it('is offered only to users who may see costs', async () => {
+    new FakeApi()
+      .on('GET /auth/me', ok(me(['stock.opening'])))
+      .on('GET /locations', ok(LOCATIONS))
+      .install();
+    await renderApp('/inventory/opening');
+    expect(await screen.findByText(ar.common.forbiddenHint)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: ar.nav.opening })).toBeNull();
+  });
 });
 
 describe('counts (ADR 0025)', () => {
@@ -250,5 +327,71 @@ describe('counts (ADR 0025)', () => {
     const n = (v: number) => new Intl.NumberFormat('ar').format(v);
     expect(cells.slice(-2)).toEqual([n(5), n(-2)]);
     expect(screen.getByRole('button', { name: ar.count.approve })).toBeTruthy();
+  });
+});
+
+describe('locations (ADR 0018)', () => {
+  it('shows a rename error in the rename dialog, and checks names in the app language', async () => {
+    const api = new FakeApi()
+      .on('GET /auth/me', ok(me(['locations.manage'])))
+      .on('GET /locations', ok(LOCATIONS))
+      .on(`PATCH /locations/${shop}`, {
+        status: 409,
+        body: { error: { code: 'resource.conflict' } },
+      });
+    api.install();
+    await renderApp('/locations');
+    fireEvent.click(await screen.findByRole('button', { name: ar.locations.add }));
+    expect(await screen.findByText(ar.validation.required)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: ar.locations.rename }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(labelled(ar.locations.name)), {
+      target: { value: 'المخزن' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: ar.common.save }));
+    expect(await within(dialog).findByText(ar.errors.resource.conflict)).toBeTruthy();
+    expect(api.calls.filter((c) => c.method === 'POST')).toEqual([]);
+  });
+});
+
+describe('review items (ADR 0020)', () => {
+  const item = (n: number): ReviewItem => ({
+    id: id(2000 + n),
+    kind: 'negative_stock',
+    partId: id(3000 + n),
+    sku: `RV-${String(n).padStart(3, '0')}`,
+    nameAr: null,
+    nameEn: null,
+    locationId: shop,
+    moveId: id(4000 + n),
+    documentId: id(5000 + n),
+    quantity: 0,
+    openedAt: '2026-10-07T10:00:00.000Z',
+    resolvedAt: '2026-10-08T10:00:00.000Z',
+    resolvedBy: id(1),
+    resolutionNote: 'counted',
+  });
+
+  it('pages through resolved items', async () => {
+    const api = new FakeApi()
+      .on('GET /auth/me', ok(me(['stock.review'])))
+      .on('GET /locations', ok(LOCATIONS))
+      .on('GET /stock/review-items', (_body, query) =>
+        ok(
+          query.get('status') === 'resolved' && query.get('offset') === '0'
+            ? Array.from({ length: 100 }, (_, n) => item(n + 1))
+            : query.get('status') === 'resolved'
+              ? [item(101)]
+              : [],
+        ),
+      );
+    api.install();
+    await renderApp('/inventory/review');
+    fireEvent.click(await screen.findByText(ar.review.resolved));
+    await screen.findByText('RV-100');
+    fireEvent.click(screen.getByRole('button', { name: ar.common.next }));
+    await screen.findByText('RV-101');
+    const last = api.calls.filter((c) => c.path === '/stock/review-items').at(-1);
+    expect(new URLSearchParams(last?.query).get('offset')).toBe('100');
   });
 });

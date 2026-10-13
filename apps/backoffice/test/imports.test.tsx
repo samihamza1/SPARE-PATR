@@ -318,3 +318,27 @@ describe('mapping a vehicle code', () => {
     expect(posted).toEqual([lc200.id, lc300.id, lc300.id]);
   });
 });
+
+describe('an import that sets selling prices', () => {
+  it('is analysed and applied only by users who manage prices', async () => {
+    new FakeApi()
+      .on('GET /auth/me', ok(me(['catalog.import'])))
+      .on(
+        `GET /catalog/imports/${BATCH}`,
+        ok(
+          batch({
+            mapping: {
+              columns: { partNumber: 0, sellPrice: 3 },
+              numberKind: 'oem',
+              priceListId: id(70),
+            },
+          }),
+        ),
+      )
+      .on(`GET /catalog/imports/${BATCH}/rows`, ok([]))
+      .install();
+    await renderApp(`/catalog/imports/${BATCH}`);
+    expect(await screen.findByText(ar.import.needsPrices)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: ar.import.analyse })).toBeNull();
+  });
+});

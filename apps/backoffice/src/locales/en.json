@@ -36,6 +36,7 @@
   "home": {
     "welcome": "Welcome, {{name}}",
     "shop": "Shop",
+    "shopName": "{{name}} ({{slug}})",
     "functionalCurrency": "Functional currency",
     "permissions": "Your permissions"
   },
@@ -51,7 +52,9 @@
     "forbiddenHint": "Ask the shop administrator for the permission you need.",
     "copy": "Copy",
     "copied": "Copied",
-    "removeNamed": "Remove {{name}}"
+    "removeNamed": "Remove {{name}}",
+    "label": "{{label}}:",
+    "labelValue": "{{label}}: {{value}}"
   },
   "fields": {
     "username": "Username",
@@ -789,7 +792,8 @@
     "noReadableSheet": "Every sheet in this file is too large (over {{rows, number}} rows or {{columns, number}} columns). Split it into smaller sheets.",
     "appliedSummary": "Prices set: {{prices, number}} · Vehicle links added: {{fitments, number}}",
     "mapCodeTitle": "Map code {{code}}",
-    "mapSaved": "Already saved: {{names}}. Saving again adds only the rest."
+    "mapSaved": "Already saved: {{names}}. Saving again adds only the rest.",
+    "needsPrices": "This import sets selling prices; analysing and applying it needs the price management permission."
   },
   "locations": {
     "title": "Locations",
@@ -901,6 +905,7 @@
     "rate": "Exchange rate",
     "noRateNeeded": "Not needed",
     "rateMissing": "Enter the {{currency}} rate for {{date}} first.",
+    "rateOf": "Rate of {{date}}",
     "units": "Units",
     "totalIn": "Total in {{currency}}",
     "post": "Post opening stock",

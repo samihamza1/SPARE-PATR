@@ -36,6 +36,7 @@
   "home": {
     "welcome": "أهلاً {{name}}",
     "shop": "المحل",
+    "shopName": "{{name}} ({{slug}})",
     "functionalCurrency": "العملة الوظيفية",
     "permissions": "صلاحياتك"
   },
@@ -51,7 +52,9 @@
     "forbiddenHint": "اطلب من مدير المحل منحك الصلاحية المطلوبة.",
     "copy": "نسخ",
     "copied": "تم النسخ",
-    "removeNamed": "إزالة {{name}}"
+    "removeNamed": "إزالة {{name}}",
+    "label": "{{label}}:",
+    "labelValue": "{{label}}: {{value}}"
   },
   "fields": {
     "username": "اسم المستخدم",
@@ -789,7 +792,8 @@
     "noReadableSheet": "كل أوراق هذا الملف كبيرة جداً (أكثر من {{rows, number}} صف أو {{columns, number}} عمود). قسّمها إلى أوراق أصغر.",
     "appliedSummary": "أسعار مسجّلة: {{prices, number}} · روابط سيارات مضافة: {{fitments, number}}",
     "mapCodeTitle": "ربط الرمز {{code}}",
-    "mapSaved": "حُفظ من قبل: {{names}}. الحفظ مرة أخرى يضيف الباقي فقط."
+    "mapSaved": "حُفظ من قبل: {{names}}. الحفظ مرة أخرى يضيف الباقي فقط.",
+    "needsPrices": "هذا الاستيراد يحدد أسعار البيع؛ تحليله وتطبيقه يحتاجان صلاحية إدارة الأسعار."
   },
   "locations": {
     "title": "المواقع",
@@ -901,6 +905,7 @@
     "rate": "سعر الصرف",
     "noRateNeeded": "غير مطلوب",
     "rateMissing": "أدخل سعر {{currency}} ليوم {{date}} أولاً.",
+    "rateOf": "سعر يوم {{date}}",
     "units": "الوحدات",
     "totalIn": "الإجمالي بـ {{currency}}",
     "post": "ترحيل الرصيد الافتتاحي",

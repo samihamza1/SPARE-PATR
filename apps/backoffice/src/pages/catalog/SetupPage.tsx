@@ -84,7 +84,7 @@ function Brands() {
       {can('catalog.manage') && (
         <Form
           onSubmit={() => {
-            if (!required.ok()) return;
+            if (save.isPending || !required.ok()) return;
             save.mutate(
               {
                 method: 'POST',
@@ -118,7 +118,9 @@ function Brands() {
               error={required.errors.kind}
               data={BRAND_KINDS.map((k) => ({ value: k, label: t(`catalog.brandKind.${k}`) }))}
             />
-            <Button type="submit">{t('setup.add')}</Button>
+            <Button type="submit" loading={save.isPending}>
+              {t('setup.add')}
+            </Button>
           </Group>
         </Form>
       )}
@@ -162,7 +164,7 @@ function Categories() {
       {can('catalog.manage') && (
         <Form
           onSubmit={() => {
-            if (!required.ok()) return;
+            if (save.isPending || !required.ok()) return;
             save.mutate(
               {
                 method: 'POST',
@@ -211,7 +213,9 @@ function Categories() {
                 label: categoryName(c, i18n.language),
               }))}
             />
-            <Button type="submit">{t('setup.add')}</Button>
+            <Button type="submit" loading={save.isPending}>
+              {t('setup.add')}
+            </Button>
           </Group>
         </Form>
       )}
@@ -287,7 +291,7 @@ function PriceLists() {
       {manage && (
         <Form
           onSubmit={() => {
-            if (!required.ok()) return;
+            if (save.isPending || !required.ok()) return;
             save.mutate(
               {
                 method: 'POST',
@@ -330,7 +334,9 @@ function PriceLists() {
                 setIsDefault(e.currentTarget.checked);
               }}
             />
-            <Button type="submit">{t('setup.add')}</Button>
+            <Button type="submit" loading={save.isPending}>
+              {t('setup.add')}
+            </Button>
           </Group>
         </Form>
       )}
