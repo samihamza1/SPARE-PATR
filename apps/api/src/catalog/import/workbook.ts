@@ -231,14 +231,34 @@ function previewOf(sheet: WorkbookSheet, sampleRows: number): ImportSheetPreview
   };
 }
 
+/**
+ * The most text one reply may carry. Here cells can share one string (a shared string used
+ * by many cells), but the reply copies every occurrence: without a budget, a small file
+ * could send gigabytes to the API. Real stock and price lists stay far below it.
+ */
+export const MAX_REPLY_CHARS = 32 * 1024 * 1024;
+
+function assertWithinReplyBudget(sheets: readonly { rows: readonly ImportCell[][] }[]): void {
+  let chars = 0;
+  for (const sheet of sheets) {
+    for (const row of sheet.rows) {
+      for (const cell of row) chars += cell?.length ?? 0;
+      if (chars > MAX_REPLY_CHARS) throw new ApiError(400, 'import.file_too_large');
+    }
+  }
+}
+
 /** Answers one request; every failure becomes an error code. */
 export async function handleReadRequest(request: ReadRequest): Promise<ReadResponse> {
   try {
     if (request.kind === 'preview') {
       const sheets = await readWorkbookInThread(request.bytes, request.fileName);
-      return { ok: true, previews: sheets.map((s) => previewOf(s, request.sampleRows)) };
+      const previews = sheets.map((s) => previewOf(s, request.sampleRows));
+      assertWithinReplyBudget(previews);
+      return { ok: true, previews };
     }
     const sheets = await readWorkbookInThread(request.bytes, request.fileName, request.only);
+    assertWithinReplyBudget(sheets);
     return { ok: true, sheets };
   } catch (err) {
     return { ok: false, code: err instanceof ApiError ? err.code : 'import.unreadable_file' };

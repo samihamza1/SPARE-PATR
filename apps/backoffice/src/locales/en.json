@@ -233,6 +233,7 @@
       "sheet_not_found": "That sheet is not in the file",
       "too_many_rows": "The sheet is too large for one import (too many rows or columns)",
       "file_too_large": "The file is too large or complex to read; remove the sheets you do not need or split it",
+      "busy": "Other files are being read; try again shortly",
       "already_applied": "This sheet of this file was already imported",
       "not_editable": "This import was already applied or discarded"
     },
