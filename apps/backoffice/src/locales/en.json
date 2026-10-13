@@ -491,6 +491,7 @@
     "noResults": "No parts found",
     "understood": "Understood as",
     "year": "Year {{year}}",
+    "years": "Years {{from}}–{{to}}",
     "number": "Number {{number}}",
     "matchedBy": {
       "number": "Part number",

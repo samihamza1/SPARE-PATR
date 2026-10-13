@@ -657,6 +657,14 @@ describe('search: numbers, vehicles, years and replacements (review fixes)', () 
       await fit(owner, p.id, gen);
     }
     await createPart(owner, '2015', { nameEn: 'Numeric SKU part' });
+    await createPart(owner, '2008', { nameEn: 'Another numeric SKU part' });
+    for (const [sku, number] of [
+      ['RX-MANN', 'W712/75'],
+      ['RX-HU', 'HU7008z'],
+      ['RX-DECOY2', '18000-55'],
+    ] as const) {
+      await createPart(owner, sku, { nameEn: 'Filter', numbers: [{ number }] });
+    }
   });
 
   it('finds a dashed or spaced number typed next to a word, and only that number', async () => {
@@ -684,11 +692,63 @@ describe('search: numbers, vehicles, years and replacements (review fixes)', () 
     expect(skus(pg)).toEqual(['RX-PG2008']);
 
     const range = await search('فحمات امامية لاندكروزر 2015-2023');
-    expect(range.interpretation.year).toBe(2015);
+    expect(range.interpretation).toMatchObject({ year: 2015, yearTo: 2023 });
     expect(skus(range)).toEqual(['BP-J300', 'BP-OEM']);
 
     const numeric = await search('2015');
     expect(numeric.results.map((r) => [r.part.sku, r.matchedBy])).toEqual([['2015', 'number']]);
+  });
+
+  it('reads a year after another vehicle as the year, not as a model named like it', async () => {
+    const r = await search('corolla 2008 rear pads');
+    expect(r.interpretation).toMatchObject({ year: 2008, yearTo: 2008, partNumber: null });
+    expect(r.interpretation.vehicles.map((v) => v.id)).toEqual([corolla]);
+    expect(skus(r)).toEqual(['RX-COR']);
+  });
+
+  it('does not match the year or a vehicle word as a part number', async () => {
+    const r = await search('فحمات امامية لاندكروزر 2015');
+    expect(r.interpretation.partNumber).toBeNull();
+    expect(skus(r)).not.toContain('2015');
+    expect(skus(r, 'number')).toEqual([]);
+  });
+
+  it('finds part numbers typed as printed, letters apart from the digits', async () => {
+    for (const [q, sku] of [
+      ['W 712/75', 'RX-MANN'],
+      ['HU 7008 z', 'RX-HU'],
+      ['filter W 712/75', 'RX-MANN'],
+    ] as const) {
+      const r = await search(q);
+      expect(skus(r, 'number'), q).toEqual([sku]);
+    }
+    // A number not in the catalog: an unrelated prefix match must not leave a stray
+    // letter as a match-almost-everything word.
+    const r = await search('A 271 180 00 09');
+    expect(skus(r)).toEqual(['RX-DECOY2']);
+  });
+
+  it('finds the longest join even when a shorter one matches hundreds of numbers', async () => {
+    const decoy = await createPart(owner, 'RX-MANY');
+    const target = await createPart(owner, 'RX-LONG', { numbers: [{ number: '77441-23-XY' }] });
+    // 260 numbers that start like the first token and sort before the target's.
+    await withTenant(env.ownerDb, shop.tenantId, (trx) =>
+      trx
+        .insertInto('part_numbers')
+        .values(
+          Array.from({ length: 260 }, (_, i) => ({
+            id: newId(),
+            tenant_id: shop.tenantId,
+            part_id: decoy.id,
+            number: `77441${String.fromCharCode(65 + (i % 26))}${String(Math.floor(i / 26))}`,
+            kind: 'oem',
+          })),
+        )
+        .execute(),
+    );
+    const r = await search('77441 23');
+    expect(r.interpretation.partNumber).toBe('7744123');
+    expect(r.results.map((x) => x.part.id)).toEqual([target.id]);
   });
 
   it('leads from an archived part to the part that replaces it today', async () => {
