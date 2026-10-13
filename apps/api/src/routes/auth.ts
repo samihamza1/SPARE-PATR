@@ -1,6 +1,7 @@
 import type { DB } from '@autoparts/db';
 import { withTenant } from '@autoparts/db';
 import { changeOwnPasswordSchema, loginRequestSchema } from '@autoparts/shared';
+import type { AuditAction } from '@autoparts/shared';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import type { FastifyInstance, FastifyReply, preHandlerAsyncHookHandler } from 'fastify';
 import type { Kysely } from 'kysely';
@@ -125,7 +126,7 @@ export function authRoutes(
         const failed = async (
           reason: string,
           userId: string | null,
-          action = 'auth.login_failed',
+          action: AuditAction = 'auth.login_failed',
         ) => {
           await audit(
             trx,

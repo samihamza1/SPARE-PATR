@@ -398,7 +398,13 @@
       "vehicle": "Vehicles",
       "vehicle_alias": "Vehicle words",
       "price_list": "Price lists",
-      "import_batch": "Imports"
+      "import_batch": "Imports",
+      "location": "Locations",
+      "fx_rate": "Exchange rates",
+      "stock_document": "Stock documents",
+      "opening_stock": "Opening stock",
+      "stock_count": "Counts",
+      "stock_review_item": "Review items"
     },
     "actions": {
       "auth": {
@@ -427,7 +433,8 @@
         "create": "Device added",
         "new_code": "New enrollment code",
         "enroll": "Device enrolled",
-        "revoke": "Device revoked"
+        "revoke": "Device revoked",
+        "location": "Device location changed"
       },
       "session": { "revoke": "Session ended" },
       "tenant": { "provision": "Shop created" },
@@ -477,6 +484,28 @@
         "import": "Catalog imported",
         "import_stage": "Import file checked",
         "import_discard": "Import discarded"
+      },
+      "location": {
+        "create": "Location added",
+        "update": "Location changed"
+      },
+      "fx_rate": {
+        "create": "Exchange rate entered"
+      },
+      "stock": {
+        "opening": "Opening stock",
+        "adjustment": "Stock adjustment",
+        "transfer": "Transfer between locations",
+        "part_transfer": "Stock moved to the replacement part",
+        "count": "Approved count differences",
+        "opening_posted": "Opening stock posted"
+      },
+      "stock_count": {
+        "open": "Count started",
+        "cancel": "Count cancelled"
+      },
+      "stock_review": {
+        "resolve": "Review item resolved"
       }
     },
     "field": "Field",
