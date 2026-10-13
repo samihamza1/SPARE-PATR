@@ -434,12 +434,16 @@ export function countRoutes(app: FastifyInstance, deps: PlatformDeps): void {
             'i.resolved_by',
             'i.resolution_note',
           ])
-          .orderBy('i.opened_at')
-          .limit(f.limit);
+          .limit(f.limit)
+          .offset(f.offset);
+        // Open items oldest first (a work queue); resolved ones latest resolved first.
         q =
           f.status === 'open'
-            ? q.where('i.resolved_at', 'is', null)
-            : q.where('i.resolved_at', 'is not', null);
+            ? q.where('i.resolved_at', 'is', null).orderBy('i.opened_at').orderBy('i.id')
+            : q
+                .where('i.resolved_at', 'is not', null)
+                .orderBy('i.resolved_at', 'desc')
+                .orderBy('i.id', 'desc');
         return (await q.execute()).map((i) => ({
           id: i.id,
           kind: i.kind as ReviewItem['kind'],

@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Form, useRequired } from '../../forms';
 import { LocationKindBadge, inventoryKeys } from '../../inventory/common';
 
 /** The shop, storerooms and warehouses (ADR 0018). */
@@ -34,12 +35,15 @@ export function LocationsPage() {
   const [kind, setKind] = useState<Location['kind']>('warehouse');
   const [renaming, setRenaming] = useState<Location | null>(null);
   const [newName, setNewName] = useState('');
+  const required = useRequired({ name });
+  const renameRequired = useRequired({ name: newName });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['inventory', 'locations'] });
 
   const create = useMutation({
     mutationFn: () => api<Location>('POST', '/locations', { id: newId(), name: name.trim(), kind }),
     onSuccess: async () => {
       setName('');
+      required.reset();
       await refresh();
     },
   });
@@ -57,37 +61,41 @@ export function LocationsPage() {
       <Title order={2}>{t('locations.title')}</Title>
       <Text c="dimmed">{t('locations.intro')}</Text>
       {manage && (
-        <Group
-          component="form"
-          align="flex-end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (name.trim() !== '') create.mutate();
+        <Form
+          onSubmit={() => {
+            if (create.isPending || !required.ok()) return;
+            create.mutate();
           }}
         >
-          <TextInput
-            label={t('locations.name')}
-            required
-            value={name}
-            onChange={(e) => {
-              setName(e.currentTarget.value);
-            }}
-          />
-          <Select
-            label={t('locations.kindLabel')}
-            data={LOCATION_KINDS.map((k) => ({ value: k, label: t(`locations.kind.${k}`) }))}
-            value={kind}
-            allowDeselect={false}
-            onChange={(v) => {
-              if (v === 'shop' || v === 'warehouse') setKind(v);
-            }}
-          />
-          <Button type="submit" loading={create.isPending}>
-            {t('locations.add')}
-          </Button>
-        </Group>
+          <Group align="flex-end">
+            <TextInput
+              label={t('locations.name')}
+              required
+              value={name}
+              error={required.errors.name}
+              onChange={(e) => {
+                setName(e.currentTarget.value);
+              }}
+            />
+            <Select
+              label={t('locations.kindLabel')}
+              data={LOCATION_KINDS.map((k) => ({ value: k, label: t(`locations.kind.${k}`) }))}
+              value={kind}
+              allowDeselect={false}
+              onChange={(v) => {
+                if (v === 'shop' || v === 'warehouse') setKind(v);
+              }}
+            />
+            <Button type="submit" loading={create.isPending}>
+              {t('locations.add')}
+            </Button>
+          </Group>
+        </Form>
       )}
-      <ErrorAlert error={locations.error ?? create.error ?? update.error} />
+      {/* A rename's error shows in its dialog. */}
+      <ErrorAlert
+        error={locations.error ?? create.error ?? (renaming === null ? update.error : null)}
+      />
       <Table striped>
         <Table.Thead>
           <Table.Tr>
@@ -115,6 +123,8 @@ export function LocationsPage() {
                       size="xs"
                       variant="light"
                       onClick={() => {
+                        update.reset();
+                        renameRequired.reset();
                         setRenaming(l);
                         setNewName(l.name);
                       }}
@@ -161,29 +171,32 @@ export function LocationsPage() {
           opened
           onClose={() => {
             setRenaming(null);
+            update.reset();
           }}
           title={t('locations.rename')}
         >
-          <Stack
-            component="form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (newName.trim() !== '')
-                update.mutate({ id: renaming.id, body: { name: newName.trim() } });
+          <Form
+            onSubmit={() => {
+              if (update.isPending || !renameRequired.ok()) return;
+              update.mutate({ id: renaming.id, body: { name: newName.trim() } });
             }}
           >
-            <TextInput
-              label={t('locations.name')}
-              required
-              value={newName}
-              onChange={(e) => {
-                setNewName(e.currentTarget.value);
-              }}
-            />
-            <Button type="submit" loading={update.isPending}>
-              {t('common.save')}
-            </Button>
-          </Stack>
+            <Stack>
+              <TextInput
+                label={t('locations.name')}
+                required
+                value={newName}
+                error={renameRequired.errors.name}
+                onChange={(e) => {
+                  setNewName(e.currentTarget.value);
+                }}
+              />
+              <ErrorAlert error={update.error} />
+              <Button type="submit" loading={update.isPending}>
+                {t('common.save')}
+              </Button>
+            </Stack>
+          </Form>
         </Modal>
       )}
     </Stack>

@@ -28,18 +28,25 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api } from '../../api';
+import { useAuth } from '../../auth';
 import { partName } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Pager } from '../../components/Pager';
 import { useFormatDateTime } from '../../format';
 import { Amount, LocationSelect, inventoryKeys, useFormatQuantity } from '../../inventory/common';
 
 const COST_PATTERN = /^(0|[1-9]\d*)(\.\d+)?$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const LINES_PAGE = 100;
 
 /** Opening stock drafts, and starting one from an applied catalog import (ADR 0024). */
 export function OpeningListPage() {
   const { t } = useTranslation();
+  const { can } = useAuth();
   const navigate = useNavigate();
   const formatDateTime = useFormatDateTime();
+  // Starting from an import lists the imports, which needs catalog.import.
+  const mayStart = can('catalog.import');
   const drafts = useQuery({
     queryKey: inventoryKeys.openings,
     queryFn: () => api<OpeningSummary[]>('GET', '/stock/opening'),
@@ -47,6 +54,7 @@ export function OpeningListPage() {
   const imports = useQuery({
     queryKey: ['catalog', 'imports'],
     queryFn: () => api<ImportBatch[]>('GET', '/catalog/imports'),
+    enabled: mayStart,
   });
   const used = new Set(
     (drafts.data ?? []).filter((d) => d.status !== 'discarded').map((d) => d.batchId),
@@ -62,27 +70,29 @@ export function OpeningListPage() {
     <Stack>
       <Title order={2}>{t('opening.title')}</Title>
       <Text c="dimmed">{t('opening.intro')}</Text>
-      <Group align="flex-end">
-        <Select
-          label={t('opening.fromImport')}
-          placeholder={applied.length === 0 ? t('opening.noImports') : undefined}
-          data={applied.map((b) => ({
-            value: b.id,
-            label: t('opening.importLabel', { file: b.fileName, sheet: b.sheet ?? '' }),
-          }))}
-          value={batchId}
-          onChange={setBatchId}
-        />
-        <Button
-          disabled={batchId === null}
-          loading={start.isPending}
-          onClick={() => {
-            start.mutate();
-          }}
-        >
-          {t('opening.start')}
-        </Button>
-      </Group>
+      {mayStart && (
+        <Group align="flex-end">
+          <Select
+            label={t('opening.fromImport')}
+            placeholder={applied.length === 0 ? t('opening.noImports') : undefined}
+            data={applied.map((b) => ({
+              value: b.id,
+              label: t('opening.importLabel', { file: b.fileName, sheet: b.sheet ?? '' }),
+            }))}
+            value={batchId}
+            onChange={setBatchId}
+          />
+          <Button
+            disabled={batchId === null}
+            loading={start.isPending}
+            onClick={() => {
+              start.mutate();
+            }}
+          >
+            {t('opening.start')}
+          </Button>
+        </Group>
+      )}
       <ErrorAlert error={drafts.error ?? imports.error ?? start.error} />
       <Table striped>
         <Table.Thead>
@@ -122,7 +132,10 @@ function LineEditor({
   onSaved: () => Promise<unknown>;
 }) {
   const { t } = useTranslation();
-  const [cost, setCost] = useState(line.costSource === 'entered' ? (line.unitCost ?? '') : '');
+  // An entered cost, also one saved before the line's quantity.
+  const [cost, setCost] = useState(
+    line.costSource === 'entered' || line.status === 'needs_quantity' ? (line.unitCost ?? '') : '',
+  );
   const [quantity, setQuantity] = useState<number | ''>(line.quantity ?? '');
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -220,15 +233,22 @@ export function OpeningDraftPage() {
   const queryClient = useQueryClient();
   const format = useFormatQuantity();
   const [status, setStatus] = useState<OpeningLineStatus>('needs_cost');
+  // Keyset pages by SKU: the last SKU of each page shown so far.
+  const [after, setAfter] = useState<string[]>([]);
+  const cursor = after.at(-1);
   const draft = useQuery({
     queryKey: inventoryKeys.opening(id),
     queryFn: () => api<OpeningDraft>('GET', `/stock/opening/${id}`),
   });
   const lines = useQuery({
-    queryKey: inventoryKeys.openingLines(id, status),
-    queryFn: () =>
-      api<OpeningLine[]>('GET', `/stock/opening/${id}/lines?status=${status}&limit=500`),
+    queryKey: [...inventoryKeys.openingLines(id, status), cursor ?? ''],
+    queryFn: () => {
+      const params = new URLSearchParams({ status, limit: String(LINES_PAGE) });
+      if (cursor !== undefined) params.set('after', cursor);
+      return api<OpeningLine[]>('GET', `/stock/opening/${id}/lines?${params.toString()}`);
+    },
   });
+  const page = lines.data ?? [];
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: inventoryKeys.opening(id) }),
@@ -269,14 +289,12 @@ export function OpeningDraftPage() {
                 if (locationId !== null && d.status === 'draft') settings.mutate({ locationId });
               }}
             />
-            <TextInput
-              type="date"
-              label={t('opening.asOf')}
+            <AsOfInput
+              key={d.asOf}
               value={d.asOf}
               disabled={d.status !== 'draft'}
-              onChange={(e) => {
-                const asOf = e.currentTarget.value;
-                if (asOf !== '') settings.mutate({ asOf });
+              onCommit={(asOf) => {
+                settings.mutate({ asOf });
               }}
             />
             <Stack gap={0}>
@@ -294,6 +312,11 @@ export function OpeningDraftPage() {
                       quote: d.fxRate.quote,
                     })}
               </Text>
+              {d.fxRate !== null && (
+                <Text size="xs" c="dimmed">
+                  {t('opening.rateOf', { date: d.fxRate.rateDate })}
+                </Text>
+              )}
             </Stack>
           </Group>
           {missingRate && (
@@ -350,7 +373,9 @@ export function OpeningDraftPage() {
           <Tabs
             value={status}
             onChange={(v) => {
-              if (v !== null) setStatus(v as OpeningLineStatus);
+              if (v === null) return;
+              setStatus(v as OpeningLineStatus);
+              setAfter([]);
             }}
           >
             <Tabs.List>
@@ -373,7 +398,7 @@ export function OpeningDraftPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {lines.data?.map((l) => (
+              {page.map((l) => (
                 <Table.Tr key={l.partId}>
                   <Table.Td dir="ltr">{l.sku}</Table.Td>
                   <Table.Td>{partName(l, i18n.language)}</Table.Td>
@@ -404,8 +429,56 @@ export function OpeningDraftPage() {
               ))}
             </Table.Tbody>
           </Table>
+          <ErrorAlert error={lines.error} />
+          <Pager
+            hasPrevious={after.length > 0}
+            hasNext={page.length === LINES_PAGE}
+            onPrevious={() => {
+              setAfter(after.slice(0, -1));
+            }}
+            onNext={() => {
+              const last = page.at(-1);
+              if (last !== undefined) setAfter([...after, last.sku]);
+            }}
+          />
         </>
       )}
     </Stack>
+  );
+}
+
+/**
+ * The go-live date, saved once the whole date is entered (on leaving the field or Enter):
+ * a date input reports each typed digit as a complete date (0002-10-07 while typing the
+ * year), and saving those would convert at another day's rate.
+ */
+function AsOfInput({
+  value,
+  disabled,
+  onCommit,
+}: {
+  value: string;
+  disabled: boolean;
+  onCommit: (asOf: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(value);
+  const commit = () => {
+    if (DATE_PATTERN.test(text) && text !== value) onCommit(text);
+  };
+  return (
+    <TextInput
+      type="date"
+      label={t('opening.asOf')}
+      value={text}
+      disabled={disabled}
+      onChange={(e) => {
+        setText(e.currentTarget.value);
+      }}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+      }}
+    />
   );
 }

@@ -154,6 +154,43 @@ describe('required fields are checked before anything is sent', () => {
   });
 });
 
+describe('a create form sends once while its request is on its way', () => {
+  it('catalog setup: a double submit adds one category', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const api = new FakeApi()
+      .on('GET /auth/me', ok(me(ALL)))
+      .on('GET /catalog/price-lists', ok([]))
+      .on('GET /currencies', ok(CURRENCIES))
+      .on('GET /catalog/brands', ok([]))
+      .on('GET /catalog/categories', ok([]))
+      .on('POST /catalog/categories', async (body) => {
+        await held;
+        return { status: 201, body };
+      });
+    api.install();
+    await renderApp('/catalog/setup');
+    fireEvent.click(await screen.findByRole('tab', { name: ar.setup.categories }));
+    const panel = await screen.findByRole('tabpanel', { name: ar.setup.categories });
+    fireEvent.change(within(panel).getByLabelText(labelled(ar.catalog.nameAr)), {
+      target: { value: 'فرامل' },
+    });
+    const add = within(panel).getByRole('button', { name: ar.setup.add });
+    fireEvent.click(add);
+    await waitFor(() => {
+      expect(add.hasAttribute('disabled')).toBe(true);
+    });
+    // Enter in the field submits the form without the (disabled) button.
+    const form = add.closest('form');
+    if (form === null) throw new Error('no form');
+    fireEvent.submit(form);
+    fireEvent.click(add);
+    release();
+    await settle();
+    expect(api.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+});
+
 describe('required text fields use the app language, not the browser', () => {
   it('sign-in: says in Arabic which fields are missing', async () => {
     const api = new FakeApi().on('GET /auth/me', {

@@ -1,5 +1,5 @@
 import type { StockBalanceRow } from '@autoparts/shared';
-import { Anchor, Button, Checkbox, Group, Stack, Table, Title } from '@mantine/core';
+import { Anchor, Checkbox, Group, Stack, Table, Title } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { Link } from 'react-router';
 import { api } from '../../api';
 import { partName } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Pager } from '../../components/Pager';
 import { useFormatDateTime } from '../../format';
 import {
   LocationSelect,
@@ -89,27 +90,17 @@ export function StockPage() {
           ))}
         </Table.Tbody>
       </Table>
-      <Group>
-        <Button
-          variant="default"
-          disabled={after.length === 0}
-          onClick={() => {
-            setAfter(after.slice(0, -1));
-          }}
-        >
-          {t('common.previous')}
-        </Button>
-        <Button
-          variant="default"
-          disabled={rows.length < PAGE}
-          onClick={() => {
-            const last = rows.at(-1);
-            if (last !== undefined) setAfter([...after, last.sku]);
-          }}
-        >
-          {t('common.next')}
-        </Button>
-      </Group>
+      <Pager
+        hasPrevious={after.length > 0}
+        hasNext={rows.length === PAGE}
+        onPrevious={() => {
+          setAfter(after.slice(0, -1));
+        }}
+        onNext={() => {
+          const last = rows.at(-1);
+          if (last !== undefined) setAfter([...after, last.sku]);
+        }}
+      />
     </Stack>
   );
 }

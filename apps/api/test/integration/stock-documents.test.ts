@@ -691,6 +691,14 @@ describe('review items', () => {
       .json<ReviewItem[]>()
       .filter((i) => i.partId === part);
     expect(open).toEqual([]);
+    // Resolved items page through, latest resolved first.
+    const page = async (offset: number) =>
+      (
+        await supervisor.get(`/stock/review-items?status=resolved&limit=1&offset=${String(offset)}`)
+      ).json<ReviewItem[]>();
+    const [first, second, third] = [await page(0), await page(1), await page(2)];
+    expect([first.length, second.length, third.length]).toEqual([1, 1, 0]);
+    expect(new Set([first[0]?.id, second[0]?.id])).toEqual(new Set(items.map((i) => i.id)));
   });
 });
 

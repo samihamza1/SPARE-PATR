@@ -19,7 +19,12 @@ import { setupI18n } from '../src/i18n';
 import ar from '../src/locales/ar.json';
 import { Providers, createQueryClient } from '../src/Providers';
 
-type Handler = (body: unknown, query: URLSearchParams) => { status: number; body?: unknown };
+interface FakeResponse {
+  status: number;
+  body?: unknown;
+}
+/** A response, or a promise of one to hold the request open (a slow network). */
+type Handler = (body: unknown, query: URLSearchParams) => FakeResponse | Promise<FakeResponse>;
 
 /** A tiny fake of the API: "METHOD /path" -> handler. Unmatched requests fail the test. */
 export class FakeApi {
@@ -27,7 +32,7 @@ export class FakeApi {
   private readonly routes = new Map<string, Handler>();
   private readonly unreachable = new Set<string>();
 
-  on(route: string, handler: Handler | { status: number; body?: unknown }): this {
+  on(route: string, handler: Handler | FakeResponse): this {
     this.unreachable.delete(route);
     this.routes.set(route, typeof handler === 'function' ? handler : () => handler);
     return this;
@@ -52,12 +57,12 @@ export class FakeApi {
       if (handler === undefined) {
         return Promise.reject(new Error(`Unexpected request ${method} ${path}`));
       }
-      const res = handler(body, new URLSearchParams(query));
-      return Promise.resolve(
-        new Response(res.status === 204 ? null : JSON.stringify(res.body ?? {}), {
-          status: res.status,
-          headers: { 'content-type': 'application/json' },
-        }),
+      return Promise.resolve(handler(body, new URLSearchParams(query))).then(
+        (res) =>
+          new Response(res.status === 204 ? null : JSON.stringify(res.body ?? {}), {
+            status: res.status,
+            headers: { 'content-type': 'application/json' },
+          }),
       );
     });
   }

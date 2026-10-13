@@ -193,9 +193,12 @@ function Aliases() {
             <Table.Tr key={a.id}>
               <Table.Td dir="ltr">{a.alias}</Table.Td>
               <Table.Td>
-                {t(`vehicles.target.${a.target}`)}
-                {a.target === 'vehicle' && `: ${a.vehicleName ?? ''}`}
-                {a.target === 'category' && `: ${catName(a.categoryId)}`}
+                {a.target === 'ignore'
+                  ? t('vehicles.target.ignore')
+                  : t('common.labelValue', {
+                      label: t(`vehicles.target.${a.target}`),
+                      value: a.target === 'vehicle' ? (a.vehicleName ?? '') : catName(a.categoryId),
+                    })}
               </Table.Td>
               <Table.Td>
                 {can('catalog.manage') && (

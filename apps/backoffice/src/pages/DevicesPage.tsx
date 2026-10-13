@@ -40,7 +40,8 @@ function EnrollmentCode({ result, onClose }: { result: CodeResult; onClose: () =
       <Stack>
         <Text>{t('devices.codeInstructions')}</Text>
         <Text>
-          {t('auth.shopCode')}: <Code dir="ltr">{me?.tenant.slug}</Code>
+          {t('common.label', { label: t('auth.shopCode') })}{' '}
+          <Code dir="ltr">{me?.tenant.slug}</Code>
         </Text>
         <Group>
           <Code fz="xl" dir="ltr" data-testid="enrollment-code">
