@@ -129,7 +129,11 @@ function LineEditor({
       api<OpeningDraft>('PATCH', `/stock/opening/${draft.id}/lines/${line.partId}`, body),
     onSuccess: onSaved,
   });
-  const editable = draft.status === 'draft' && line.exclusion !== 'already_opened';
+  // Lines the draft excludes itself (opened elsewhere, archived part) cannot be edited.
+  const editable =
+    draft.status === 'draft' &&
+    line.exclusion !== 'already_opened' &&
+    line.exclusion !== 'archived_part';
   if (!editable) return null;
   return (
     <Group gap="xs" wrap="nowrap">

@@ -124,7 +124,12 @@ export const partTransferRequestSchema = z.object({
 
 export const OPENING_LINE_STATUSES = ['ready', 'needs_cost', 'needs_quantity', 'excluded'] as const;
 export type OpeningLineStatus = (typeof OPENING_LINE_STATUSES)[number];
-export const OPENING_EXCLUSIONS = ['by_user', 'already_opened', 'no_quantity'] as const;
+export const OPENING_EXCLUSIONS = [
+  'by_user',
+  'already_opened',
+  'archived_part',
+  'no_quantity',
+] as const;
 
 export const createOpeningSchema = z.object({
   id: uuidV7Schema,
@@ -186,12 +191,14 @@ export const openingDraftSchema = z.object({
   asOf: dateSchema,
   costCurrency: currencyCodeSchema,
   functionalCurrency: currencyCodeSchema,
+  /** The go-live day's own rate (product owner, 2026-10-06); null until one is entered. */
   fxRate: z
     .object({
       id: uuidSchema,
       base: currencyCodeSchema,
       quote: currencyCodeSchema,
       rate: z.string(),
+      rateDate: dateSchema,
     })
     .nullable(),
   status: z.enum(['draft', 'posted', 'discarded']),
