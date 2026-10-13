@@ -140,3 +140,17 @@ These changes close findings of the review. They tighten the decision above.
 - **Discarding a batch blanks its staged cells** (`raw`, `parsed`). Row numbers, issues
   and decisions remain. A wrongly chosen sheet (personal entries, debts) does not stay
   readable. The rows of a discarded batch read as empty.
+
+## Addendum (2026-10-13, Sprint 4 review)
+
+- **Reply budget**: the reader refuses a file whose reply would carry more than 32 million
+  characters (`import.file_too_large`). In the reader, cells can share one string (a
+  shared string used by thousands of cells), but the reply copies every occurrence, so a
+  file of a few kilobytes could otherwise send gigabytes to the API.
+- **Bounded queue**: at most 2 files are read at once, at most 6 wait, none waits longer
+  than 30 seconds, and one tenant has at most 2 files in reading or waiting. Past any of
+  these the request is refused at once with `import.busy` (503), instead of holding its
+  upload in memory without end.
+- **Unfinished scans**: a sheet the pre-scan could not read to the end (for example an
+  empty-valued cell outside a row, which the library skips) counts as too large, so the
+  library never builds a sheet the scan did not bound.

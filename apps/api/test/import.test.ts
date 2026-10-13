@@ -214,6 +214,44 @@ describe('reading limits (crafted files)', { timeout: READS }, () => {
     expect((await readWorkbook(heavy, 'heavy.xlsx', 'A'))[0]?.rows).toHaveLength(20_000);
   }, 30_000);
 
+  it('refuses a reply larger than the text budget: shared strings are copied per cell', async () => {
+    // One 32,767-character shared string in 3,000 cells of each of two sheets: a 16 KB
+    // file whose reply would carry about 200 million characters.
+    const long = 'x'.repeat(32_767);
+    const cells = (r: number) =>
+      Array.from(
+        { length: 100 },
+        (_, c) => `<c r="${columnName(c)}${String(r)}" t="s"><v>0</v></c>`,
+      ).join('');
+    const sheet = worksheet(
+      Array.from({ length: 30 }, (_, r) => `<row r="${String(r + 1)}">${cells(r + 1)}</row>`).join(
+        '',
+      ),
+    );
+    const file = buildXlsxFromXml(
+      { A: sheet, B: sheet },
+      {
+        'xl/sharedStrings.xml': strToU8(
+          `<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><t>${long}</t></si></sst>`,
+        ),
+      },
+    );
+    expect(file.length).toBeLessThan(100_000);
+    expect(await errorCodeOf(readWorkbook(file, 'a.xlsx'))).toBe('import.file_too_large');
+    expect(await errorCodeOf(inspectWorkbook(file, 'a.xlsx', 20))).toBe('import.file_too_large');
+  });
+
+  it('refuses reads past the queue instead of letting them wait without end', async () => {
+    const file = buildXlsx({ A: [['x']] });
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () => errorCodeOf(readWorkbook(file, 'a.xlsx'))),
+    );
+    expect(results.filter((r) => r === 'import.busy').length).toBeGreaterThan(0);
+    expect(results.filter((r) => r === 'ok').length).toBeGreaterThanOrEqual(2);
+    // Once the queue drains, files are read again.
+    expect(await errorCodeOf(readWorkbook(file, 'a.xlsx'))).toBe('ok');
+  });
+
   it('reads files in parallel, a bounded number at a time', async () => {
     const file = buildXlsx({ A: [['x']] });
     const all = await Promise.all([1, 2, 3, 4].map(() => readWorkbook(file, 'a.xlsx')));
@@ -300,6 +338,23 @@ describe('scanning sheet XML before it is read', () => {
     expect(scan('<row r="1e9"/>').rows).toBe(1e9);
     expect(scan('<row><c r="A0x10"><v>1</v></c></row>').dataRows).toBe(16);
   });
+
+  it(
+    'reports a sheet it could not scan to the end as ambiguous',
+    async () => {
+      // An empty-valued cell outside a row stops the scan, but not the reader.
+      const rows = Array.from(
+        { length: 50 },
+        (_, r) => `<row r="${String(r + 1)}"><c r="EZ${String(r + 1)}"><v>1</v></c></row>`,
+      ).join('');
+      const data = `<c r="A1" t="inlineStr"><is/></c>${rows}`;
+      expect(scan(data).ambiguous).toBe(true);
+      expect(await readWorkbook(buildXlsxFromXml({ S: worksheet(data) }), 's.xlsx')).toEqual([
+        { name: 'S', rows: [], tooLarge: true },
+      ]);
+    },
+    READS,
+  );
 
   it('reports XML the reader could read differently as ambiguous', () => {
     expect(scan('<row r="1"><c r="A1" a="x>y"><v>1</v></c></row>').ambiguous).toBe(true);
