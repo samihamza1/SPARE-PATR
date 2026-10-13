@@ -242,7 +242,7 @@ export function App() {
           element={
             <RequirePermission permission="stock.adjust">
               <Page>
-                <MovementPage mode="adjust" />
+                <MovementPage key="adjust" mode="adjust" />
               </Page>
             </RequirePermission>
           }
@@ -252,7 +252,7 @@ export function App() {
           element={
             <RequirePermission permission="stock.transfer">
               <Page>
-                <MovementPage mode="transfer" />
+                <MovementPage key="transfer" mode="transfer" />
               </Page>
             </RequirePermission>
           }
@@ -260,7 +260,7 @@ export function App() {
         <Route
           path="inventory/opening"
           element={
-            <RequirePermission permission="stock.opening">
+            <RequirePermission permission={['stock.opening', 'cost.view']}>
               <Page>
                 <OpeningListPage />
               </Page>
@@ -270,7 +270,7 @@ export function App() {
         <Route
           path="inventory/opening/:id"
           element={
-            <RequirePermission permission="stock.opening">
+            <RequirePermission permission={['stock.opening', 'cost.view']}>
               <Page>
                 <OpeningDraftPage />
               </Page>

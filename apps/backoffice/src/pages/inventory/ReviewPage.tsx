@@ -17,6 +17,7 @@ import { Link } from 'react-router';
 import { api } from '../../api';
 import { partName } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Pager } from '../../components/Pager';
 import { useFormatDateTime } from '../../format';
 import { inventoryKeys, useFormatQuantity, useLocationNames } from '../../inventory/common';
 
@@ -54,6 +55,8 @@ function Resolve({ item, onDone }: { item: ReviewItem; onDone: () => Promise<unk
   );
 }
 
+const REVIEW_PAGE = 100;
+
 /** Stock that went below zero or left without a known cost (ADR 0020). */
 export function ReviewPage() {
   const { t, i18n } = useTranslation();
@@ -62,9 +65,14 @@ export function ReviewPage() {
   const formatDateTime = useFormatDateTime();
   const locationName = useLocationNames();
   const [status, setStatus] = useState<'open' | 'resolved'>('open');
+  const [page, setPage] = useState(0);
   const items = useQuery({
-    queryKey: inventoryKeys.review(status),
-    queryFn: () => api<ReviewItem[]>('GET', `/stock/review-items?status=${status}`),
+    queryKey: [...inventoryKeys.review(status), page],
+    queryFn: () =>
+      api<ReviewItem[]>(
+        'GET',
+        `/stock/review-items?status=${status}&limit=${String(REVIEW_PAGE)}&offset=${String(page * REVIEW_PAGE)}`,
+      ),
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['inventory', 'review'] });
 
@@ -73,7 +81,10 @@ export function ReviewPage() {
       <Title order={2}>{t('review.title')}</Title>
       <SegmentedControl
         value={status}
-        onChange={setStatus}
+        onChange={(value) => {
+          setStatus(value);
+          setPage(0);
+        }}
         data={[
           { value: 'open', label: t('review.open') },
           { value: 'resolved', label: t('review.resolved') },
@@ -120,6 +131,16 @@ export function ReviewPage() {
           ))}
         </Table.Tbody>
       </Table>
+      <Pager
+        hasPrevious={page > 0}
+        hasNext={items.data?.length === REVIEW_PAGE}
+        onPrevious={() => {
+          setPage(page - 1);
+        }}
+        onNext={() => {
+          setPage(page + 1);
+        }}
+      />
     </Stack>
   );
 }

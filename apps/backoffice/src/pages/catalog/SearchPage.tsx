@@ -62,11 +62,11 @@ export function SearchPage() {
       {data !== undefined && (
         <Group gap="xs" aria-label={t('search.understood')}>
           <Text size="sm" c="dimmed">
-            {t('search.understood')}:
+            {t('common.label', { label: t('search.understood') })}
           </Text>
           {data.interpretation.vehicles.map((v) => (
             <Badge key={v.id} variant="light">
-              {t(`catalog.level.${v.level}`)}: {v.name}
+              {t('common.labelValue', { label: t(`catalog.level.${v.level}`), value: v.name })}
             </Badge>
           ))}
           {data.interpretation.year !== null && (

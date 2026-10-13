@@ -319,6 +319,8 @@ export type ReviewItem = z.infer<typeof reviewItemSchema>;
 export const listReviewItemsQuerySchema = z.object({
   status: z.enum(['open', 'resolved']).default('open'),
   limit: z.coerce.number().int().min(1).max(200).default(100),
+  /** Items to skip: open items oldest first, resolved ones latest resolved first. */
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 });
 
 export const resolveReviewItemSchema = z.object({

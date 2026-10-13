@@ -9,12 +9,14 @@ export function RequirePermission({
   permission,
   children,
 }: {
-  permission: Permission;
+  /** One permission, or several that are all needed. */
+  permission: Permission | readonly Permission[];
   children: ReactNode;
 }) {
   const { can } = useAuth();
   const { t } = useTranslation();
-  if (!can(permission)) {
+  const needed: readonly Permission[] = typeof permission === 'string' ? [permission] : permission;
+  if (!needed.every((p) => can(p))) {
     return (
       <Alert color="yellow" role="alert" title={t('errors.auth.forbidden')}>
         {t('common.forbiddenHint')}
