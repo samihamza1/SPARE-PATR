@@ -29,10 +29,13 @@ const PG_CHECK_VIOLATION = '23514';
 const STOCK_ERRORS: Record<string, { status: number; code: ErrorCode }> = {
   // A move was computed from a state that changed: safe to retry.
   '40001': { status: 409, code: 'stock.concurrent_change' },
+  // Two writers locked the same parts or locations in opposite orders: safe to retry.
+  '40P01': { status: 409, code: 'stock.concurrent_change' },
   ST001: { status: 409, code: 'stock.insufficient' },
   ST002: { status: 409, code: 'location.archived' },
   ST003: { status: 409, code: 'stock.has_stock' },
   ST004: { status: 409, code: 'stock.review_unresolved' },
+  ST005: { status: 409, code: 'catalog.archived' },
 };
 
 export function buildServer(deps: ServerDeps, options: FastifyServerOptions = {}): FastifyInstance {
