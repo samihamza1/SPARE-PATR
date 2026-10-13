@@ -53,3 +53,17 @@ decided (2026-10-06):
 
 - The draft's totals in both currencies equal the posted moves to the cent (tested).
 - After posting, differences found on the shelf go through a count (ADR 0025).
+
+## Addendum (2026-10-13, Sprint 4 review)
+
+- **The go-live day's own rate**: without a chosen rate, a draft converts only at a rate
+  recorded for its as-of date; an earlier day's rate is not used (product owner,
+  2026-10-06). The draft shows the rate's date; until that day's rate is entered, the
+  draft has no functional total and posting is refused (`fx.rate_missing`).
+- **Lines that became unpostable** are re-checked when posting: a part that got opening
+  stock at the location since the draft was built (`already_opened`), or was archived
+  (`archived_part`). If any line changes, it is excluded, the change is kept, and posting
+  answers `opening.lines_changed` so the owner reviews before posting again.
+- **The cost in use follows the data**: an entered unit cost, else the file's cost (scaled
+  to a corrected quantity), else none. A cost entered before the quantity is kept, and a
+  non-whole quantity corrected by the owner keeps the file's cost.

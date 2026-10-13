@@ -99,12 +99,17 @@ export function countRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           const b = request.body;
           const existing = await trx
             .selectFrom('stock_counts')
-            .select('location_id')
+            .select(['location_id', 'scope', 'category_id', 'note'])
             .where('id', '=', b.id)
             .executeTakeFirst();
           if (existing !== undefined) {
-            if (existing.location_id !== b.locationId)
-              throw new ApiError(409, 'idempotency.conflict');
+            // A retry returns the count; the same id with another request is a conflict.
+            const same =
+              existing.location_id === b.locationId &&
+              existing.scope === b.scope &&
+              existing.category_id === (b.categoryId ?? null) &&
+              existing.note === (b.note ?? null);
+            if (!same) throw new ApiError(409, 'idempotency.conflict');
             return loadCount(trx, b.id);
           }
           const location = await trx
