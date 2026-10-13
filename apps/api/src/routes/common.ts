@@ -10,7 +10,7 @@ import type { AuthContext } from '../auth/context';
 import type { PlatformDeps } from '../auth/plugin';
 import { authOf } from '../auth/plugin';
 import { loadPermissions } from '../auth/sessions';
-import { ApiError, notFound } from '../errors';
+import { ApiError, notFound, unauthenticated } from '../errors';
 
 export type Trx = Transaction<DB>;
 
@@ -56,9 +56,22 @@ const exceedsOwnPermissions = () => new ApiError(403, 'auth.exceeds_own_permissi
 /**
  * No privilege escalation (ADR 0017): an actor may only grant, remove or define
  * permissions it holds itself, and only act on users whose permissions it holds. The
- * actor's permissions are re-read here, in the transaction, after lockAdminChanges.
+ * actor's permissions are re-read here, in the transaction, after lockAdminChanges; so is
+ * the actor itself, which may have been archived (or signed out) while this request
+ * waited for the lock.
  */
 export async function privilegeGuard(trx: Trx, auth: AuthContext) {
+  const active = await trx
+    .selectFrom('sessions as s')
+    .innerJoin('users as u', (j) =>
+      j.onRef('u.tenant_id', '=', 's.tenant_id').onRef('u.id', '=', 's.user_id'),
+    )
+    .select('u.id')
+    .where('s.id', '=', auth.sessionId)
+    .where('s.revoked_at', 'is', null)
+    .where('u.archived_at', 'is', null)
+    .executeTakeFirst();
+  if (active === undefined) throw unauthenticated();
   const own = await loadPermissions(trx, auth.userId);
   const assertHeld = (permissions: Iterable<Permission>): void => {
     for (const p of permissions) if (!own.has(p)) throw exceedsOwnPermissions();
