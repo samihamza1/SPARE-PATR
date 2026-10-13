@@ -35,6 +35,8 @@ export const ERROR_CODES = [
   'import.file_too_large',
   'import.already_applied',
   'import.not_editable',
+  // Too many files are being read at once: try again shortly.
+  'import.busy',
   // The target is archived: restore it first (a replacement part, a default price list).
   'catalog.archived',
   // Inventory (ADRs 0018-0021).
