@@ -327,7 +327,9 @@ export const searchHitSchema = z.object({
 export const searchResultSchema = z.object({
   interpretation: z.object({
     text: z.array(z.string()),
+    /** The year, or the first of a range ("2015-2023"); yearTo is the last. */
     year: z.int().nullable(),
+    yearTo: z.int().nullable(),
     partNumber: z.string().nullable(),
     vehicles: z.array(
       z.object({ id: uuidSchema, name: z.string(), level: z.enum(VEHICLE_LEVELS) }),

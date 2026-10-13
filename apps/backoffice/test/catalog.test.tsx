@@ -17,6 +17,7 @@ describe('salesperson search', () => {
       interpretation: {
         text: ['فحمات'],
         year: 2015,
+        yearTo: 2023,
         partNumber: null,
         vehicles: [{ id: id(90), name: 'Land Cruiser', level: 'model' }],
       },
@@ -50,7 +51,7 @@ describe('salesperson search', () => {
     api.install();
     await renderApp('/search');
     const box = await screen.findByRole('textbox', { name: ar.search.title });
-    fireEvent.change(box, { target: { value: 'فحمات امامية لاندكروزر 2015' } });
+    fireEvent.change(box, { target: { value: 'فحمات امامية لاندكروزر 2015-2023' } });
     fireEvent.click(screen.getByRole('button', { name: ar.search.submit }));
 
     const card = await screen.findByTestId('search-result');
@@ -75,9 +76,11 @@ describe('salesperson search', () => {
       );
     });
     expect(alternatives[1]?.textContent).toContain(ar.inventory.outOfStock);
-    expect(screen.getByText(ar.search.year.replace('{{year}}', '2015'))).toBeTruthy();
+    expect(
+      screen.getByText(ar.search.years.replace('{{from}}', '2015').replace('{{to}}', '2023')),
+    ).toBeTruthy();
     const searched = api.calls.find((c) => c.path === '/catalog/search');
-    expect(new URLSearchParams(searched?.query).get('q')).toBe('فحمات امامية لاندكروزر 2015');
+    expect(new URLSearchParams(searched?.query).get('q')).toBe('فحمات امامية لاندكروزر 2015-2023');
   });
 });
 
