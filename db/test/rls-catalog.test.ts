@@ -30,7 +30,14 @@ const GLOBAL_TABLES = new Set([
  * Invariant 3: tables that must be append-only. The checks below cover every table whose
  * forbid_mutation trigger fires on UPDATE; this list makes sure none of these lost it.
  */
-const REQUIRED_APPEND_ONLY = ['audit_log', 'part_prices'];
+const REQUIRED_APPEND_ONLY = [
+  'audit_log',
+  'part_prices',
+  'fx_rates',
+  'stock_documents',
+  'stock_moves',
+  'ledger_queue',
+];
 
 const APP_ROLE = 'autoparts_app';
 
@@ -286,14 +293,16 @@ async function viewsWithoutSecurityInvoker(exec: Executor = db): Promise<string[
 
 /**
  * SECURITY DEFINER functions run with the owner's rights; without a pinned search_path a
- * caller could shadow tables or operators with objects of its own.
+ * caller could shadow tables or operators with objects of its own. pg_temp must be named
+ * last: left out, it is searched first for tables, so a caller's temp table would win.
  */
 async function definersWithoutSearchPath(exec: Executor = db): Promise<string[]> {
   const { rows } = await sql<{ fn: string }>`
     SELECT p.oid::regprocedure::text AS fn
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE p.prosecdef AND n.nspname = 'public'
-      AND NOT coalesce(EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search\\_path=%'), false)
+      AND NOT coalesce(EXISTS (SELECT 1 FROM unnest(p.proconfig) c
+                                WHERE c ~ '^search_path=.*, *pg_temp$'), false)
     ORDER BY 1`.execute(exec);
   return rows.map((r) => r.fn);
 }
@@ -368,7 +377,7 @@ describe('tenant isolation catalog (invariant 4)', () => {
     expect(await viewsWithoutSecurityInvoker()).toEqual([]);
   });
 
-  it('pins search_path on every SECURITY DEFINER function', async () => {
+  it('pins search_path, pg_temp last, on every SECURITY DEFINER function', async () => {
     expect(await definersWithoutSearchPath()).toEqual([]);
   });
 
@@ -563,6 +572,19 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
         definersWithoutSearchPath,
       ),
     ).toEqual(['guard_probe_fn()']);
+  });
+
+  it('flags a SECURITY DEFINER function whose search_path leaves pg_temp first', async () => {
+    const fn = (path: string) =>
+      `CREATE FUNCTION guard_probe_fn() RETURNS int LANGUAGE sql SECURITY DEFINER
+         SET search_path = ${path} AS $$ SELECT 1 $$;`;
+    expect(await probe(fn('pg_catalog, public'), definersWithoutSearchPath)).toEqual([
+      'guard_probe_fn()',
+    ]);
+    expect(await probe(fn('pg_temp, pg_catalog, public'), definersWithoutSearchPath)).toEqual([
+      'guard_probe_fn()',
+    ]);
+    expect(await probe(fn('pg_catalog, public, pg_temp'), definersWithoutSearchPath)).toEqual([]);
   });
 
   it('flags a view without security_invoker, and accepts one with it', async () => {
