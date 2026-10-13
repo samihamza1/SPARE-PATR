@@ -398,7 +398,13 @@
       "vehicle": "السيارات",
       "vehicle_alias": "كلمات السيارات",
       "price_list": "قوائم الأسعار",
-      "import_batch": "الاستيراد"
+      "import_batch": "الاستيراد",
+      "location": "المواقع",
+      "fx_rate": "أسعار الصرف",
+      "stock_document": "مستندات المخزون",
+      "opening_stock": "الرصيد الافتتاحي",
+      "stock_count": "الجرد",
+      "stock_review_item": "بنود المراجعة"
     },
     "actions": {
       "auth": {
@@ -427,7 +433,8 @@
         "create": "إضافة جهاز",
         "new_code": "رمز تسجيل جديد",
         "enroll": "تسجيل جهاز",
-        "revoke": "إلغاء جهاز"
+        "revoke": "إلغاء جهاز",
+        "location": "تغيير موقع جهاز"
       },
       "session": { "revoke": "إنهاء جلسة" },
       "tenant": { "provision": "إنشاء المحل" },
@@ -477,6 +484,28 @@
         "import": "استيراد الكتالوج",
         "import_stage": "فحص ملف استيراد",
         "import_discard": "إلغاء استيراد"
+      },
+      "location": {
+        "create": "إضافة موقع",
+        "update": "تعديل موقع"
+      },
+      "fx_rate": {
+        "create": "إدخال سعر صرف"
+      },
+      "stock": {
+        "opening": "رصيد افتتاحي",
+        "adjustment": "تسوية مخزون",
+        "transfer": "نقل بين المواقع",
+        "part_transfer": "نقل المخزون إلى القطعة البديلة",
+        "count": "فروقات جرد معتمَد",
+        "opening_posted": "ترحيل الرصيد الافتتاحي"
+      },
+      "stock_count": {
+        "open": "بدء جرد",
+        "cancel": "إلغاء جرد"
+      },
+      "stock_review": {
+        "resolve": "حلّ بند مراجعة"
       }
     },
     "field": "الحقل",
