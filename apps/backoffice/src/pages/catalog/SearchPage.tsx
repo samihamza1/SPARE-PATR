@@ -70,7 +70,15 @@ export function SearchPage() {
             </Badge>
           ))}
           {data.interpretation.year !== null && (
-            <Badge variant="light">{t('search.year', { year: data.interpretation.year })}</Badge>
+            <Badge variant="light">
+              {data.interpretation.yearTo !== null &&
+              data.interpretation.yearTo !== data.interpretation.year
+                ? t('search.years', {
+                    from: data.interpretation.year,
+                    to: data.interpretation.yearTo,
+                  })
+                : t('search.year', { year: data.interpretation.year })}
+            </Badge>
           )}
           {data.interpretation.partNumber !== null && (
             <Badge variant="light" dir="ltr">

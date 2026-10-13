@@ -491,6 +491,7 @@
     "noResults": "لا توجد قطع مطابقة",
     "understood": "فهمتُ البحث كالتالي",
     "year": "سنة {{year}}",
+    "years": "السنوات {{from}}–{{to}}",
     "number": "رقم {{number}}",
     "matchedBy": {
       "number": "رقم القطعة",
