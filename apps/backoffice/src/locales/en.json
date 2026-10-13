@@ -259,7 +259,8 @@
     "opening": {
       "not_ready": "Some lines still need a cost or a quantity",
       "exists": "Opening stock for this import already exists",
-      "not_applied": "Apply the import before entering opening stock"
+      "not_applied": "Apply the import before entering opening stock",
+      "lines_changed": "Some lines changed since the draft was built (opened elsewhere or part archived) and were excluded; review them and post again"
     },
     "count": {
       "not_open": "This count is closed",
@@ -891,6 +892,7 @@
     "exclusion": {
       "by_user": "Excluded",
       "already_opened": "Already has opening stock",
+      "archived_part": "Archived part",
       "no_quantity": "No quantity"
     }
   },

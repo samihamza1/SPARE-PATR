@@ -380,6 +380,155 @@ describe('opening stock from an applied import', () => {
   });
 });
 
+describe('opening stock: corrections and late changes', () => {
+  const n = (v: string) => ({ n: v });
+  /** A business date `days` before the given one (YYYY-MM-DD). */
+  const daysBefore = (date: string, days: number) =>
+    new Date(Date.parse(`${date}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+
+  async function applySheet(rows: unknown[][], costCurrency = 'AAA'): Promise<string> {
+    const staged = await owner.post('/catalog/imports', {
+      id: newId(),
+      fileName: 'opening-2.xlsx',
+      contentBase64: buildXlsx({
+        Stock: [['Part', 'Name', 'Cost', 'Qty'], ...rows],
+      } as Parameters<typeof buildXlsx>[0]).toString('base64'),
+      sheet: 'Stock',
+      headerRow: 1,
+      mapping: {
+        columns: { partNumber: 0, nameEn: 1, cost: 2, quantity: 3 },
+        numberKind: 'oem',
+        priceListId: null,
+        costCurrency,
+        skuPrefix: 'OQ',
+      },
+    });
+    expect(staged.statusCode, staged.body).toBe(201);
+    const batchId = staged.json<ImportBatchDetail>().id;
+    expect((await owner.post(`/catalog/imports/${batchId}/apply`)).statusCode).toBe(200);
+    return batchId;
+  }
+
+  const lineOf = async (draftId: string, name: string) =>
+    (await owner.get(`/stock/opening/${draftId}/lines`))
+      .json<OpeningLine[]>()
+      .find((l) => l.nameEn === name);
+
+  it('keeps the file cost when a non-whole quantity is corrected, and an entered cost', async () => {
+    const batchId = await applySheet([
+      ['F-600', 'Hose', n('10'), n('2.5')],
+      ['G-700', 'Clamp', null, n('1.5')],
+    ]);
+    const draft = (
+      await owner.post('/stock/opening', { id: newId(), batchId })
+    ).json<OpeningDraft>();
+    const hose = await lineOf(draft.id, 'Hose');
+    expect(hose).toMatchObject({ status: 'needs_quantity', quantity: null });
+    // 2.5 units at 10 = 25 in the file; 3 units keep the file's unit cost: 30.
+    await owner.patch(`/stock/opening/${draft.id}/lines/${hose?.partId ?? ''}`, { quantity: 3 });
+    expect(await lineOf(draft.id, 'Hose')).toMatchObject({
+      status: 'ready',
+      amount: '30.00',
+      costSource: 'file',
+    });
+    // A cost entered before the quantity is kept for when the quantity comes.
+    const clamp = await lineOf(draft.id, 'Clamp');
+    await owner.patch(`/stock/opening/${draft.id}/lines/${clamp?.partId ?? ''}`, {
+      unitCost: '4',
+    });
+    expect(await lineOf(draft.id, 'Clamp')).toMatchObject({
+      status: 'needs_quantity',
+      unitCost: '4',
+    });
+    await owner.patch(`/stock/opening/${draft.id}/lines/${clamp?.partId ?? ''}`, { quantity: 2 });
+    expect(await lineOf(draft.id, 'Clamp')).toMatchObject({
+      status: 'ready',
+      amount: '8.00',
+      costSource: 'entered',
+    });
+  });
+
+  it('re-checks lines when posting: opened elsewhere or archived since, then posts', async () => {
+    const batchId = await applySheet([
+      ['H-800', 'Belt', n('5'), n('1')],
+      ['J-900', 'Fuse', n('1'), n('2')],
+      ['K-100', 'Relay', n('2'), n('3')],
+    ]);
+    const draft = (
+      await owner.post('/stock/opening', { id: newId(), batchId })
+    ).json<OpeningDraft>();
+    expect(draft.counts.ready).toBe(3);
+    const belt = await lineOf(draft.id, 'Belt');
+    const fuse = await lineOf(draft.id, 'Fuse');
+    // Belt gets opening stock at this location through another document.
+    await withTenant(env.appDb, shop.tenantId, async (trx) =>
+      postStockDocument(
+        trx,
+        shop.tenantId,
+        {
+          id: newId(),
+          kind: 'opening',
+          requestHash: requestHash('other draft'),
+          note: null,
+          occurredAt: env.clock.now,
+          origin: 'online',
+          deviceId: null,
+          postedBy: shop.ownerUserId,
+        },
+        [
+          {
+            op: 'receive',
+            partId: belt?.partId ?? '',
+            locationId: mainShop.id,
+            quantity: 1,
+            kind: 'opening',
+            value: {
+              amount: '5.00',
+              currency: 'AAA',
+              fxRate: '1',
+              fxBase: 'AAA',
+              fxQuote: 'AAA',
+              functionalAmount: '5.00',
+              fxRateId: null,
+            },
+          },
+        ],
+        await readMoneySettings(trx),
+      ),
+    );
+    // Fuse is archived.
+    expect(
+      (await owner.patch(`/catalog/parts/${fuse?.partId ?? ''}`, { archived: true })).statusCode,
+    ).toBe(200);
+    expect(errorCode(await owner.post(`/stock/opening/${draft.id}/post`))).toBe(
+      'opening.lines_changed',
+    );
+    expect(await lineOf(draft.id, 'Belt')).toMatchObject({ exclusion: 'already_opened' });
+    expect(await lineOf(draft.id, 'Fuse')).toMatchObject({ exclusion: 'archived_part' });
+    const res = await owner.post(`/stock/opening/${draft.id}/post`);
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json<StockDocument>().moves).toHaveLength(1);
+  });
+
+  it("converts only at the go-live day's own rate", async () => {
+    const batchId = await applySheet([['L-200', 'Lamp', n('3.6725'), n('1')]], 'BBB');
+    let draft = (await owner.post('/stock/opening', { id: newId(), batchId })).json<OpeningDraft>();
+    const today = draft.asOf;
+    expect(draft.fxRate).toMatchObject({ rate: '3.6725', rateDate: today });
+    const asOf = daysBefore(today, 2);
+    const rate = (rateDate: string, value: string) =>
+      owner.post('/fx-rates', { id: newId(), base: 'AAA', quote: 'BBB', rate: value, rateDate });
+    expect((await rate(daysBefore(today, 3), '3.60')).statusCode).toBe(201);
+    // An earlier day's rate is not the go-live day's.
+    draft = (await owner.patch(`/stock/opening/${draft.id}`, { asOf })).json<OpeningDraft>();
+    expect(draft).toMatchObject({ asOf, fxRate: null, totals: { functionalAmount: null } });
+    expect(errorCode(await owner.post(`/stock/opening/${draft.id}/post`))).toBe('fx.rate_missing');
+    expect((await rate(asOf, '3.65')).statusCode).toBe(201);
+    draft = (await owner.get(`/stock/opening/${draft.id}`)).json<OpeningDraft>();
+    expect(draft.fxRate).toMatchObject({ rate: '3.65', rateDate: asOf });
+  });
+});
+
 describe('counts', () => {
   let part: string;
   let other: string;
@@ -419,6 +568,12 @@ describe('counts', () => {
       scope: 'all',
     });
     expect(errorCode(twice)).toBe('count.open_exists');
+    // A retry returns the count; the same id with another request is refused.
+    const body = { id: count.id, locationId: storeroom.id, scope: 'all' };
+    expect((await supervisor.post('/stock/counts', body)).json<StockCount>().id).toBe(count.id);
+    expect(
+      errorCode(await supervisor.post('/stock/counts', { ...body, note: 'another count' })),
+    ).toBe('idempotency.conflict');
   });
 
   it('is blind for counters; moves after counting are not differences', async () => {

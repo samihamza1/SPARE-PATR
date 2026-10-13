@@ -88,7 +88,11 @@ async function minorUnitsOf(trx: Trx, currency: string): Promise<number> {
   return row.minor_units;
 }
 
-/** The rate a draft converts with: the chosen one, else the one in effect on its date. */
+/**
+ * The rate a draft converts with: the chosen one, else one recorded for its go-live date.
+ * An earlier day's rate is not used: opening stock converts at the go-live day's rate
+ * (product owner, 2026-10-06).
+ */
 async function draftRate(trx: Trx, d: DraftRow, m: MoneyContext): Promise<RecordedRate | null> {
   if (d.cost_currency === m.functional.code) return null;
   if (d.fx_rate_id !== null) {
@@ -111,7 +115,8 @@ async function draftRate(trx: Trx, d: DraftRow, m: MoneyContext): Promise<Record
       rateDate: r.d,
     };
   }
-  return rateInEffect(trx, m.functional.code, d.cost_currency, d.as_of);
+  const rate = await rateInEffect(trx, m.functional.code, d.cost_currency, d.as_of);
+  return rate !== null && rate.rateDate === d.as_of ? rate : null;
 }
 
 /** Total cost of a line, rounded once (ADR 0024). */
@@ -187,7 +192,15 @@ async function loadDraft(trx: Trx, id: string, m: MoneyContext): Promise<Opening
     costCurrency: d.cost_currency,
     functionalCurrency: m.functional.code,
     fxRate:
-      rate === null ? null : { id: rate.id, base: rate.base, quote: rate.quote, rate: rate.rate },
+      rate === null
+        ? null
+        : {
+            id: rate.id,
+            base: rate.base,
+            quote: rate.quote,
+            rate: rate.rate,
+            rateDate: rate.rateDate,
+          },
     status: d.status as OpeningDraft['status'],
     counts,
     totals: {
@@ -200,13 +213,32 @@ async function loadDraft(trx: Trx, id: string, m: MoneyContext): Promise<Opening
   };
 }
 
-/** Marks lines of parts that already have opening stock at the draft's location. */
-async function markAlreadyOpened(trx: Trx, draftId: string, locationId: string): Promise<void> {
+/** Exclusions the draft sets itself; they are recomputed, never set by the user. */
+const UNPOSTABLE = ['already_opened', 'archived_part'] as const;
+
+/**
+ * Excludes the lines that cannot be posted: parts that already have opening stock at the
+ * draft's location (ADR 0024), and archived parts. Returns whether any line changed.
+ */
+async function markUnpostable(trx: Trx, draftId: string, locationId: string): Promise<boolean> {
+  const excluded = async () =>
+    (
+      await trx
+        .selectFrom('opening_stock_lines')
+        .select(['part_id', 'exclusion'])
+        .where('draft_id', '=', draftId)
+        .where('exclusion', 'in', UNPOSTABLE)
+        .orderBy('part_id')
+        .execute()
+    )
+      .map((l) => `${l.part_id}:${l.exclusion ?? ''}`)
+      .join(',');
+  const before = await excluded();
   await trx
     .updateTable('opening_stock_lines')
     .set({ exclusion: null })
     .where('draft_id', '=', draftId)
-    .where('exclusion', '=', 'already_opened')
+    .where('exclusion', 'in', UNPOSTABLE)
     .execute();
   await trx
     .updateTable('opening_stock_lines as l')
@@ -224,6 +256,22 @@ async function markAlreadyOpened(trx: Trx, draftId: string, locationId: string):
       ),
     )
     .execute();
+  await trx
+    .updateTable('opening_stock_lines as l')
+    .set({ exclusion: 'archived_part' })
+    .where('l.draft_id', '=', draftId)
+    .where('l.exclusion', 'is', null)
+    .where((eb) =>
+      eb.exists(
+        eb
+          .selectFrom('parts as p')
+          .select('p.id')
+          .whereRef('p.id', '=', 'l.part_id')
+          .where('p.archived_at', 'is not', null),
+      ),
+    )
+    .execute();
+  return (await excluded()) !== before;
 }
 
 /**
@@ -379,7 +427,7 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
             .execute();
           const units = await minorUnitsOf(trx, costCurrency);
           await buildLines(trx, auth.tenantId, b.id, b.batchId, units, m.roundingMode);
-          await markAlreadyOpened(trx, b.id, location);
+          await markUnpostable(trx, b.id, location);
           return loadDraft(trx, b.id, m);
         }),
       );
@@ -465,12 +513,12 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           fileQuantity: l.file_quantity,
           quantity: l.quantity,
           amount: l.amount,
+          // An entered cost (kept even before the quantity is known), else the file's.
           unitCost:
-            l.cost_source === 'entered'
-              ? l.unit_cost
-              : l.amount !== null && l.quantity !== null && l.quantity > 0
-                ? toDecimalString(dec(l.amount).div(String(l.quantity)).toDecimalPlaces(6))
-                : null,
+            l.unit_cost ??
+            (l.amount !== null && l.quantity !== null && l.quantity > 0
+              ? toDecimalString(dec(l.amount).div(String(l.quantity)).toDecimalPlaces(6))
+              : null),
           costSource: l.cost_source as OpeningLine['costSource'],
           suggestedUnitCost: l.suggested_unit_cost,
           status: l.status as OpeningLineStatus,
@@ -513,7 +561,7 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           })
           .where('id', '=', d.id)
           .execute();
-        if (b.locationId !== undefined) await markAlreadyOpened(trx, d.id, b.locationId);
+        if (b.locationId !== undefined) await markUnpostable(trx, d.id, b.locationId);
         return loadDraft(trx, d.id, m);
       }),
   );
@@ -541,19 +589,17 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           .where('part_id', '=', request.params.partId)
           .executeTakeFirst();
         if (line === undefined) throw notFound();
-        if (line.exclusion === 'already_opened') throw new ApiError(409, 'resource.conflict');
+        if (UNPOSTABLE.some((e) => e === line.exclusion)) {
+          throw new ApiError(409, 'resource.conflict');
+        }
         const b = request.body;
         const next = { ...line };
         if (b.quantity !== undefined) next.quantity = b.quantity;
-        if (b.unitCost !== undefined) {
-          if (b.unitCost === null) {
-            next.unit_cost = null;
-            next.cost_source = next.file_cost_total !== null ? 'file' : null;
-          } else {
-            next.unit_cost = b.unitCost;
-            next.cost_source = 'entered';
-          }
-        }
+        if (b.unitCost !== undefined) next.unit_cost = b.unitCost;
+        // The cost in use follows the data, whatever was sent: an entered unit cost, else
+        // the file's (scaled to a changed quantity), else none.
+        next.cost_source =
+          next.unit_cost !== null ? 'entered' : next.file_cost_total !== null ? 'file' : null;
         if (b.excluded !== undefined) next.exclusion = b.excluded ? 'by_user' : null;
         const units = await minorUnitsOf(trx, d.cost_currency);
         const amount = lineAmount(next, units, m.roundingMode);
@@ -596,14 +642,17 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
   r.post(
     '/stock/opening/:id/post',
     { schema: { params: idParamsSchema }, config: { access } },
-    (request) =>
-      retryOnDuplicate(() =>
+    async (request) => {
+      const posted = await retryOnDuplicate(() =>
         inTenant(deps, request, async (trx, auth) => {
           requireCostView(auth);
           const m = await readMoneySettings(trx);
           const d = await draftRow(trx, request.params.id, true);
           if (d.status === 'posted') return loadStockDocument(trx, d.id, auth);
           if (d.status !== 'draft') throw new ApiError(409, 'resource.conflict');
+          // Another draft may have opened a part here, or a part was archived, since the
+          // lines were built: exclude those, keep that, and let the owner review first.
+          if (await markUnpostable(trx, d.id, d.location_id)) return null;
           const lines = await trx
             .selectFrom('opening_stock_lines')
             .select(['part_id', 'quantity', 'amount', 'status'])
@@ -657,6 +706,9 @@ export function openingRoutes(app: FastifyInstance, deps: PlatformDeps): void {
           );
           return doc;
         }),
-      ),
+      );
+      if (posted === null) throw new ApiError(409, 'opening.lines_changed');
+      return posted;
+    },
   );
 }

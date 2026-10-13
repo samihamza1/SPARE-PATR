@@ -55,6 +55,8 @@ export const ERROR_CODES = [
   'opening.not_ready',
   'opening.exists',
   'opening.not_applied',
+  // Posting found lines that became unpostable (opened elsewhere, part archived); review.
+  'opening.lines_changed',
   'count.not_open',
   'count.open_exists',
   'server.error',
