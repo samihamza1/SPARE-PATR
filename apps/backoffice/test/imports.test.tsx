@@ -64,7 +64,13 @@ const range = (from: number, to: number, total?: number) => {
 
 const previewRows = () => screen.getAllByTestId(/^import-row-/);
 
-describe('import preview', () => {
+/**
+ * The preview tests render pages of 500 rows in jsdom: about 8 s each on a quiet machine
+ * and twice that on a busy one, past the 15 s default (ROWS_PAGE in ImportBatchPage).
+ */
+const RENDER_PAGES = 45_000;
+
+describe('import preview', { timeout: RENDER_PAGES }, () => {
   it('pages through every staged row and shows where the user is', async () => {
     const all = stagedRows(1200);
     const api = new FakeApi()
