@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { uuidSchema, uuidV7Schema } from '../ids';
 import { currencyCodeSchema, decimalStringSchema } from '../money';
 import { quotedRateSchema } from '../money/fx';
+import { requireChange } from '../patch';
 
 const timestampSchema = z.iso.datetime({ offset: true });
 const dateSchema = z.iso.date();
@@ -31,16 +32,17 @@ export const createLocationSchema = z.object({
   sortOrder: z.int().min(0).max(10000).optional(),
 });
 
-export const updateLocationSchema = z
-  .object({
-    name: nameSchema,
-    sortOrder: z.int().min(0).max(10000),
-    /** Makes this shop the default; the previous default stops being one. */
-    isDefault: z.literal(true),
-    archived: z.boolean(),
-  })
-  .partial()
-  .refine((b) => Object.keys(b).length > 0, { message: 'request.empty' });
+export const updateLocationSchema = requireChange(
+  z
+    .object({
+      name: nameSchema,
+      sortOrder: z.int().min(0).max(10000),
+      /** Makes this shop the default; the previous default stops being one. */
+      isDefault: z.literal(true),
+      archived: z.boolean(),
+    })
+    .partial(),
+);
 
 export const listLocationsQuerySchema = z.object({
   includeArchived: z.stringbool().optional(),

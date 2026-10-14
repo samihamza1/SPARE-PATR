@@ -101,8 +101,9 @@ describe('users.manage without the other permissions', () => {
   });
 
   it('still manages users whose permissions it holds', async () => {
-    const cashier = await roleOf(owner, 'cashier');
-    const id = await createUser(manager, 'cash_b', cashier.id);
+    // A role without permissions (the cashier template now holds stock.count).
+    const basic = await createRole(owner, 'basic_a', []);
+    const id = await createUser(manager, 'cash_b', basic);
     expect((await manager.post(`/users/${id}/roles`, { roleId: managerRoleId })).statusCode).toBe(
       200,
     );
@@ -152,8 +153,8 @@ describe('roles.manage without the other permissions', () => {
         permissions: ['roles.manage', 'users.manage'],
       }),
     );
-    const cashier = await roleOf(owner, 'cashier');
-    expectRefused(await roleAdmin.patch(`/roles/${cashier.id}`, { permissions: ['audit.read'] }));
+    const basic = await createRole(owner, 'basic_b', []);
+    expectRefused(await roleAdmin.patch(`/roles/${basic}`, { permissions: ['audit.read'] }));
     expectRefused(
       await roleAdmin.post('/roles', {
         id: newId(),
@@ -163,7 +164,7 @@ describe('roles.manage without the other permissions', () => {
       }),
     );
     expect((await roleOf(owner, 'role_admin')).permissions).toEqual(['roles.manage']);
-    expect((await roleOf(owner, 'cashier')).permissions).toEqual([]);
+    expect((await roleOf(owner, 'basic_b')).permissions).toEqual([]);
   });
 
   it('cannot change a role that holds permissions it lacks', async () => {
@@ -176,8 +177,8 @@ describe('roles.manage without the other permissions', () => {
   it('still manages roles within its own permissions', async () => {
     const id = await createRole(roleAdmin, 'helpers', ['roles.manage']);
     expect((await roleAdmin.patch(`/roles/${id}`, { permissions: [] })).statusCode).toBe(200);
-    const cashier = await roleOf(owner, 'cashier');
-    expect((await roleAdmin.patch(`/roles/${cashier.id}`, { name: 'Till' })).statusCode).toBe(200);
+    const basic = await createRole(owner, 'basic_c', []);
+    expect((await roleAdmin.patch(`/roles/${basic}`, { name: 'Till' })).statusCode).toBe(200);
   });
 });
 
