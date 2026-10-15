@@ -1,6 +1,6 @@
 import { createDb } from '@autoparts/db';
 import { sql } from 'kysely';
-import { loadConfig } from './config';
+import { fastifyTrustProxy, loadConfig } from './config';
 import { buildServer } from './server';
 
 const config = loadConfig();
@@ -19,16 +19,7 @@ const app = buildServer(
     },
   },
   // TRUST_PROXY makes request.ip (rate limits, audit) the client, not the proxy.
-  {
-    logger: true,
-    trustProxy:
-      typeof config.trustProxy === 'number'
-        ? (() => {
-            const hops = config.trustProxy;
-            return (_address: string, hop: number) => hop < hops;
-          })()
-        : config.trustProxy,
-  },
+  { logger: true, trustProxy: fastifyTrustProxy(config.trustProxy) },
 );
 app.addHook('onClose', () => db.destroy());
 

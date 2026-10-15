@@ -20,7 +20,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
+import { ME_KEY } from '../auth';
 import { ErrorAlert } from '../components/ErrorAlert';
+import { Form, useRequired } from '../forms';
 
 interface SettingsResponse {
   name: string;
@@ -39,11 +41,14 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
   const [name, setName] = useState(initial.name);
   const [defaultLocale, setDefaultLocale] = useState(initial.defaultLocale);
   const [settings, setSettings] = useState<Partial<TenantSettings>>(initial.settings ?? {});
+  const required = useRequired({ name, roundingMode: settings.money?.roundingMode });
 
   const save = useMutation({
     mutationFn: () => api<SettingsResponse>('PUT', '/settings', { name, defaultLocale, settings }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      // The header shows the shop name from `me`.
+      await queryClient.invalidateQueries({ queryKey: ME_KEY });
       notifications.show({ message: t('common.saved'), color: 'green' });
     },
   });
@@ -53,9 +58,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
       withBorder
       p="md"
       component="form"
+      // Required fields are checked in code, with messages in the app's language.
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate();
+        if (required.ok()) save.mutate();
       }}
     >
       <Stack>
@@ -65,6 +72,7 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
             label={t('settings.shopName')}
             value={name}
             required
+            error={required.errors.name}
             onChange={(e) => {
               setName(e.currentTarget.value);
             }}
@@ -100,6 +108,7 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
             required
             placeholder={t('settings.choose')}
             data={ROUNDING_MODES.map((m) => ({ value: m, label: t(`rounding.${m}`) }))}
+            error={required.errors.roundingMode}
             value={settings.money?.roundingMode ?? null}
             onChange={(v) => {
               if (v !== null) setSettings({ ...settings, money: { roundingMode: v } });
@@ -204,6 +213,7 @@ function AddCurrencyModal({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState('');
   const [minorUnits, setMinorUnits] = useState<string | number>('');
   const [cashIncrement, setCashIncrement] = useState('');
+  const required = useRequired({ code, minorUnits });
   const add = useMutation({
     mutationFn: () =>
       api<Currency>('POST', '/currencies', {
@@ -219,10 +229,9 @@ function AddCurrencyModal({ onClose }: { onClose: () => void }) {
   });
   return (
     <Modal opened onClose={onClose} title={t('currencies.add')}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          add.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) add.mutate();
         }}
       >
         <Stack>
@@ -234,6 +243,7 @@ function AddCurrencyModal({ onClose }: { onClose: () => void }) {
             maxLength={3}
             dir="ltr"
             value={code}
+            error={required.errors.code}
             onChange={(e) => {
               setCode(e.currentTarget.value);
             }}
@@ -246,6 +256,7 @@ function AddCurrencyModal({ onClose }: { onClose: () => void }) {
             max={4}
             allowDecimal={false}
             value={minorUnits}
+            error={required.errors.minorUnits}
             onChange={setMinorUnits}
           />
           <TextInput
@@ -261,7 +272,7 @@ function AddCurrencyModal({ onClose }: { onClose: () => void }) {
             {t('common.save')}
           </Button>
         </Stack>
-      </form>
+      </Form>
     </Modal>
   );
 }
@@ -313,7 +324,7 @@ function Currencies() {
                   </Group>
                 </Table.Td>
                 <Table.Td>{c.minorUnits}</Table.Td>
-                <Table.Td dir="ltr">{c.cashIncrement ?? '—'}</Table.Td>
+                <Table.Td dir="ltr">{c.cashIncrement ?? t('common.none')}</Table.Td>
                 <Table.Td>
                   <Switch
                     aria-label={`${c.code} ${t('currencies.active')}`}

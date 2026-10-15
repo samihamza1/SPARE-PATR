@@ -22,7 +22,8 @@
     "username": "Username",
     "password": "Password",
     "submit": "Sign in",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "logoutFailed": "Sign-out failed: you are still signed in. Try again before leaving this device."
   },
   "home": {
     "welcome": "Welcome, {{name}}",
@@ -39,7 +40,8 @@
     "notFound": "Page not found",
     "forbiddenHint": "Ask the shop administrator for the permission you need.",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "removeNamed": "Remove {{name}}"
   },
   "fields": {
     "username": "Username",
@@ -52,7 +54,69 @@
     "locale": "Language",
     "minorUnits": "Decimal places",
     "cashIncrement": "Smallest cash denomination",
-    "settings": "Settings"
+    "settings": "Settings",
+    "tenant": "Shop code",
+    "currentPassword": "Current password",
+    "id": "Record identifier",
+    "roleId": "Role",
+    "permissions": "Permissions",
+    "defaultLocale": "Default language",
+    "session": "Sessions",
+    "idleMinutes": "Idle timeout (minutes)",
+    "absoluteHours": "Maximum session length (hours)",
+    "security": "Security",
+    "maxFailedLogins": "Failed sign-ins before lock",
+    "lockoutMinutes": "Lock duration (minutes)",
+    "money": "Money",
+    "roundingMode": "Rounding",
+    "inventory": "Inventory",
+    "allowNegativeStock": "Negative stock",
+    "sortOrder": "Order",
+    "isActive": "Active",
+    "kind": "Kind",
+    "archived": "Archived",
+    "parentId": "Parent",
+    "nameAr": "Arabic name",
+    "nameEn": "English name",
+    "level": "Level",
+    "yearFrom": "From year",
+    "yearTo": "To year",
+    "engineCode": "Engine code",
+    "displacementCc": "Displacement (cc)",
+    "fuel": "Fuel",
+    "alias": "Word",
+    "target": "Means",
+    "vehicleId": "Vehicle",
+    "categoryId": "Category",
+    "number": "Part number",
+    "brandId": "Brand",
+    "sku": "SKU",
+    "qualityGrade": "Quality",
+    "unit": "Unit",
+    "notes": "Notes",
+    "numbers": "Part numbers",
+    "ids": "Selected parts",
+    "set": "Changes",
+    "note": "Note",
+    "newPartId": "Replacement part",
+    "effectiveAt": "Effective from",
+    "reason": "Reason",
+    "partId": "Part",
+    "currency": "Currency",
+    "isDefault": "Default",
+    "price": "Price",
+    "priceListId": "Price list",
+    "fileName": "File name",
+    "contentBase64": "File",
+    "sheet": "Sheet",
+    "headerRow": "Header row",
+    "mapping": "Column mapping",
+    "columns": "Columns",
+    "numberKind": "Kind of part numbers",
+    "costCurrency": "Cost currency",
+    "skuPrefix": "SKU prefix",
+    "rowIds": "Rows",
+    "skipped": "Skipped"
   },
   "validation": {
     "invalid": "Invalid value",
@@ -60,17 +124,54 @@
       "too_short": "Too short: at least 10 characters",
       "too_long": "Too long",
       "too_common": "Too common, choose another one"
+    },
+    "required": "Required",
+    "withField": "{{field}}: {{message}}",
+    "id": {
+      "not_uuid_v7": "Invalid record identifier; reload the page and try again"
+    },
+    "name": {
+      "required": "Enter an Arabic or an English name"
+    },
+    "sku": {
+      "invalid": "Use English letters, digits and . _ / - only, starting with a letter or a digit (up to 40)"
+    },
+    "price": {
+      "negative": "The price cannot be negative"
+    },
+    "alias": {
+      "target_mismatch": "Choose the vehicle or the category this word means"
+    },
+    "bulk": {
+      "nothing_to_set": "Choose what to change"
+    },
+    "import": {
+      "mapping_needs_identity": "Map a part number, English name or Arabic name column",
+      "mapping_needs_price_list": "Choose the price list for the selling price",
+      "mapping_needs_cost_currency": "Choose the currency of the cost column",
+      "mapping_needs_sku": "Map a SKU column or enter a SKU prefix",
+      "mapping_duplicate_column": "One column is mapped to more than one field"
+    },
+    "update": {
+      "nothing_to_set": "Nothing to change"
+    },
+    "decimal": {
+      "invalid": "Enter a number such as 0.25"
+    },
+    "currency": {
+      "cash_increment_positive": "The cash increment must be greater than zero",
+      "cash_increment_scale": "The cash increment has more decimals than the currency"
     }
   },
   "errors": {
     "network": "Cannot reach the server",
     "auth": {
-      "invalid_credentials": "Shop code, username or password is incorrect",
-      "locked": "This account is temporarily locked after failed attempts; try again later",
+      "invalid_credentials": "Incorrect shop code, username or password, or the account is temporarily locked",
       "unauthenticated": "Your session has ended; please sign in again",
       "forbidden": "You do not have permission for this",
       "bad_origin": "Request refused for security reasons",
-      "wrong_password": "The current password is incorrect"
+      "wrong_password": "The current password is incorrect",
+      "exceeds_own_permissions": "Not allowed: this involves permissions you do not have yourself"
     },
     "request": {
       "invalid": "Some values are not valid",
@@ -87,11 +188,15 @@
     "import": {
       "unreadable_file": "The file could not be read; use .xlsx or .csv (UTF-8)",
       "sheet_not_found": "That sheet is not in the file",
-      "too_many_rows": "The sheet has too many rows for one import",
+      "too_many_rows": "The sheet is too large for one import (too many rows or columns)",
+      "file_too_large": "The file is too large or complex to read; remove the sheets you do not need or split it",
       "already_applied": "This sheet of this file was already imported",
       "not_editable": "This import was already applied or discarded"
     },
-    "server": { "error": "Something went wrong" }
+    "server": { "error": "Something went wrong" },
+    "catalog": {
+      "archived": "It is archived; restore it first"
+    }
   },
   "permissions": {
     "users": { "manage": "Manage users" },
@@ -222,7 +327,8 @@
         "update": "User updated",
         "archive": "User archived",
         "password_reset": "Password set by admin",
-        "password_change": "Password changed"
+        "password_change": "Password changed",
+        "password_change_failed": "Wrong current password on password change"
       },
       "role": {
         "create": "Role created",
@@ -244,7 +350,8 @@
         "create": "Part created",
         "update": "Part updated",
         "bulk_update": "Parts updated together",
-        "supersede": "Part replaced"
+        "supersede": "Part replaced",
+        "supersede_remove": "Replacement removed"
       },
       "part_number": {
         "add": "Part number added",
@@ -286,7 +393,11 @@
         "import_stage": "Import file checked",
         "import_discard": "Import discarded"
       }
-    }
+    },
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "reasonText": "Reason: {{reason}}"
   },
   "search": {
     "title": "Find a part",
@@ -299,7 +410,8 @@
     "matchedBy": {
       "number": "Part number",
       "text": "Name",
-      "vehicle": "Vehicle"
+      "vehicle": "Vehicle",
+      "replacement": "Replaces the number searched"
     },
     "alternatives": "Alternatives",
     "noAlternatives": "No alternatives",
@@ -395,7 +507,22 @@
     },
     "noPrice": "No price",
     "chooseVehicle": "Search vehicles",
-    "back": "Back to parts"
+    "back": "Back to parts",
+    "vehicleNames": "{{name}} / {{nameAr}}",
+    "vehicleOption": "{{names}} ({{level}})",
+    "vehicleOptionYears": "{{names}} ({{level}} {{years}})",
+    "yearRange": "{{from}}–{{to}}",
+    "yearRangeFrom": "{{from}} onwards",
+    "yearRangeTo": "until {{to}}",
+    "partOption": "{{sku}} — {{name}}",
+    "priceListOption": "{{name}} ({{currency}})",
+    "pathSeparator": "›",
+    "vehiclePath": "Vehicle path",
+    "archiveConfirm": "Archive this part? It disappears from lists and sales search until it is restored.",
+    "showArchived": "Show archived parts",
+    "removeSupersession": "Remove replacement",
+    "removeCopiedFitments": "Also remove the vehicles copied to the new part",
+    "removeSupersessionConfirm": "Remove the replacement by {{sku}}?"
   },
   "vehicles": {
     "title": "Vehicles",
@@ -429,7 +556,8 @@
       "ignore": "Ignore"
     },
     "mapsTo": "Means",
-    "addAlias": "Add word"
+    "addAlias": "Add word",
+    "nameOfLevel": "Name ({{level}})"
   },
   "setup": {
     "title": "Catalog setup",
@@ -461,7 +589,7 @@
     "sheet": "Sheet",
     "rows": "{{count}} rows",
     "headerRow": "Header row",
-    "headerHint": "Click the row that holds the column titles; data starts below it.",
+    "headerHint": "Click the row that holds the column titles, or enter its number; data starts below it.",
     "row": "Row",
     "field": {
       "sku": "SKU",
@@ -532,6 +660,20 @@
       "applied": "Imported",
       "discarded": "Discarded"
     },
-    "createdAt": "Started"
+    "createdAt": "Started",
+    "fileTooLarge": "The file is larger than {{max}}. Split it into smaller files or remove the sheets you do not need.",
+    "range": "Rows {{from, number}}–{{to, number}} of {{total, number}}",
+    "rangeOpen": "Rows {{from, number}}–{{to, number}}",
+    "previousRows": "Previous rows",
+    "nextRows": "Next rows",
+    "filterByDecision": "Show rows by result",
+    "filterByIssue": "Show rows by problem",
+    "columnOption": "{{letter}} — {{title}}",
+    "sheetOption": "{{name}} ({{rows}})",
+    "sheetTooLarge": "{{name}} (too large: over {{rows, number}} rows or {{columns, number}} columns)",
+    "noReadableSheet": "Every sheet in this file is too large (over {{rows, number}} rows or {{columns, number}} columns). Split it into smaller sheets.",
+    "appliedSummary": "Prices set: {{prices, number}} · Vehicle links added: {{fitments, number}}",
+    "mapCodeTitle": "Map code {{code}}",
+    "mapSaved": "Already saved: {{names}}. Saving again adds only the rest."
   }
 }

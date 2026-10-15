@@ -22,7 +22,8 @@
     "username": "اسم المستخدم",
     "password": "كلمة المرور",
     "submit": "دخول",
-    "logout": "خروج"
+    "logout": "خروج",
+    "logoutFailed": "تعذّر تسجيل الخروج: ما زلت مسجّلاً. حاول مرة أخرى قبل ترك هذا الجهاز."
   },
   "home": {
     "welcome": "أهلاً {{name}}",
@@ -39,7 +40,8 @@
     "notFound": "الصفحة غير موجودة",
     "forbiddenHint": "اطلب من مدير المحل منحك الصلاحية المطلوبة.",
     "copy": "نسخ",
-    "copied": "تم النسخ"
+    "copied": "تم النسخ",
+    "removeNamed": "إزالة {{name}}"
   },
   "fields": {
     "username": "اسم المستخدم",
@@ -52,7 +54,69 @@
     "locale": "اللغة",
     "minorUnits": "الخانات العشرية",
     "cashIncrement": "أصغر فئة نقدية",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "tenant": "رمز المحل",
+    "currentPassword": "كلمة المرور الحالية",
+    "id": "معرّف السجل",
+    "roleId": "الدور",
+    "permissions": "الصلاحيات",
+    "defaultLocale": "اللغة الافتراضية",
+    "session": "الجلسات",
+    "idleMinutes": "مهلة الخمول (دقائق)",
+    "absoluteHours": "أقصى مدة للجلسة (ساعات)",
+    "security": "الأمان",
+    "maxFailedLogins": "محاولات الدخول الفاشلة قبل القفل",
+    "lockoutMinutes": "مدة القفل (دقائق)",
+    "money": "المال",
+    "roundingMode": "طريقة التقريب",
+    "inventory": "المخزون",
+    "allowNegativeStock": "المخزون السالب",
+    "sortOrder": "الترتيب",
+    "isActive": "مفعّلة",
+    "kind": "النوع",
+    "archived": "مؤرشف",
+    "parentId": "الأصل",
+    "nameAr": "الاسم بالعربية",
+    "nameEn": "الاسم بالإنجليزية",
+    "level": "المستوى",
+    "yearFrom": "من سنة",
+    "yearTo": "إلى سنة",
+    "engineCode": "رمز المحرك",
+    "displacementCc": "السعة (سي سي)",
+    "fuel": "الوقود",
+    "alias": "الكلمة",
+    "target": "تعني",
+    "vehicleId": "السيارة",
+    "categoryId": "الفئة",
+    "number": "رقم القطعة",
+    "brandId": "الماركة",
+    "sku": "رمز الصنف",
+    "qualityGrade": "الجودة",
+    "unit": "الوحدة",
+    "notes": "ملاحظات",
+    "numbers": "أرقام القطعة",
+    "ids": "القطع المحددة",
+    "set": "التعديلات",
+    "note": "ملاحظة",
+    "newPartId": "القطعة البديلة",
+    "effectiveAt": "يسري من",
+    "reason": "السبب",
+    "partId": "القطعة",
+    "currency": "العملة",
+    "isDefault": "افتراضية",
+    "price": "السعر",
+    "priceListId": "قائمة الأسعار",
+    "fileName": "اسم الملف",
+    "contentBase64": "الملف",
+    "sheet": "الورقة",
+    "headerRow": "صف العناوين",
+    "mapping": "ربط الأعمدة",
+    "columns": "الأعمدة",
+    "numberKind": "نوع أرقام القطع",
+    "costCurrency": "عملة التكلفة",
+    "skuPrefix": "بادئة رمز الصنف",
+    "rowIds": "الصفوف",
+    "skipped": "متخطّى"
   },
   "validation": {
     "invalid": "قيمة غير صالحة",
@@ -60,17 +124,54 @@
       "too_short": "كلمة المرور قصيرة، 10 أحرف على الأقل",
       "too_long": "كلمة المرور طويلة جداً",
       "too_common": "كلمة المرور شائعة جداً، اختر غيرها"
+    },
+    "required": "مطلوب",
+    "withField": "{{field}}: {{message}}",
+    "id": {
+      "not_uuid_v7": "معرّف السجل غير صالح؛ أعد تحميل الصفحة وحاول مجدداً"
+    },
+    "name": {
+      "required": "أدخل اسماً بالعربية أو بالإنجليزية"
+    },
+    "sku": {
+      "invalid": "استخدم حروفاً إنجليزية وأرقاماً و . _ / - فقط، على أن يبدأ بحرف أو رقم (حتى 40)"
+    },
+    "price": {
+      "negative": "لا يمكن أن يكون السعر سالباً"
+    },
+    "alias": {
+      "target_mismatch": "اختر السيارة أو الفئة التي تعنيها هذه الكلمة"
+    },
+    "bulk": {
+      "nothing_to_set": "اختر ما تريد تغييره"
+    },
+    "import": {
+      "mapping_needs_identity": "اربط عمود رقم القطعة أو الاسم بالإنجليزية أو الاسم بالعربية",
+      "mapping_needs_price_list": "اختر قائمة الأسعار لسعر البيع",
+      "mapping_needs_cost_currency": "اختر عملة عمود التكلفة",
+      "mapping_needs_sku": "اربط عمود رمز الصنف أو أدخل بادئة رمز الصنف",
+      "mapping_duplicate_column": "عمود واحد مربوط بأكثر من حقل"
+    },
+    "update": {
+      "nothing_to_set": "لا يوجد ما يُغيَّر"
+    },
+    "decimal": {
+      "invalid": "أدخل رقماً مثل 0.25"
+    },
+    "currency": {
+      "cash_increment_positive": "يجب أن تكون فئة النقد أكبر من صفر",
+      "cash_increment_scale": "فئة النقد فيها خانات عشرية أكثر من العملة"
     }
   },
   "errors": {
     "network": "تعذّر الاتصال بالخادم",
     "auth": {
-      "invalid_credentials": "رمز المحل أو اسم المستخدم أو كلمة المرور غير صحيح",
-      "locked": "الحساب مقفل مؤقتاً بعد محاولات فاشلة، حاول لاحقاً",
+      "invalid_credentials": "رمز المحل أو اسم المستخدم أو كلمة المرور غير صحيح، أو أن الحساب مقفل مؤقتاً",
       "unauthenticated": "انتهت الجلسة، سجّل الدخول من جديد",
       "forbidden": "ليست لديك صلاحية لهذا الإجراء",
       "bad_origin": "طلب مرفوض لأسباب أمنية",
-      "wrong_password": "كلمة المرور الحالية غير صحيحة"
+      "wrong_password": "كلمة المرور الحالية غير صحيحة",
+      "exceeds_own_permissions": "غير مسموح: هذا الإجراء يخص صلاحيات لا تملكها أنت"
     },
     "request": {
       "invalid": "البيانات المدخلة غير صالحة",
@@ -87,11 +188,15 @@
     "import": {
       "unreadable_file": "تعذّرت قراءة الملف؛ استخدم ‎.xlsx أو ‎.csv (UTF-8)",
       "sheet_not_found": "هذه الورقة غير موجودة في الملف",
-      "too_many_rows": "عدد صفوف الورقة أكبر من المسموح في استيراد واحد",
+      "too_many_rows": "الورقة أكبر من المسموح في استيراد واحد (صفوف أو أعمدة كثيرة)",
+      "file_too_large": "الملف كبير أو معقّد جداً ولا يمكن قراءته؛ احذف الأوراق غير المطلوبة أو قسّمه",
       "already_applied": "سبق استيراد هذه الورقة من هذا الملف",
       "not_editable": "هذا الاستيراد طُبِّق أو أُلغي من قبل"
     },
-    "server": { "error": "حدث خطأ غير متوقع" }
+    "server": { "error": "حدث خطأ غير متوقع" },
+    "catalog": {
+      "archived": "العنصر مؤرشف؛ استعده أولاً"
+    }
   },
   "permissions": {
     "users": { "manage": "إدارة المستخدمين" },
@@ -222,7 +327,8 @@
         "update": "تعديل مستخدم",
         "archive": "أرشفة مستخدم",
         "password_reset": "تعيين كلمة مرور",
-        "password_change": "تغيير كلمة المرور"
+        "password_change": "تغيير كلمة المرور",
+        "password_change_failed": "كلمة مرور حالية خاطئة عند تغيير كلمة المرور"
       },
       "role": {
         "create": "إنشاء دور",
@@ -244,7 +350,8 @@
         "create": "إنشاء قطعة",
         "update": "تعديل قطعة",
         "bulk_update": "تعديل جماعي للقطع",
-        "supersede": "إحلال قطعة"
+        "supersede": "إحلال قطعة",
+        "supersede_remove": "أُزيل البديل"
       },
       "part_number": {
         "add": "إضافة رقم قطعة",
@@ -286,7 +393,11 @@
         "import_stage": "فحص ملف استيراد",
         "import_discard": "إلغاء استيراد"
       }
-    }
+    },
+    "field": "الحقل",
+    "before": "قبل",
+    "after": "بعد",
+    "reasonText": "السبب: {{reason}}"
   },
   "search": {
     "title": "البحث عن قطعة",
@@ -299,7 +410,8 @@
     "matchedBy": {
       "number": "رقم القطعة",
       "text": "الاسم",
-      "vehicle": "السيارة"
+      "vehicle": "السيارة",
+      "replacement": "بديل للرقم المطلوب"
     },
     "alternatives": "البدائل",
     "noAlternatives": "لا بدائل",
@@ -395,7 +507,22 @@
     },
     "noPrice": "بلا سعر",
     "chooseVehicle": "ابحث عن سيارة",
-    "back": "العودة إلى القطع"
+    "back": "العودة إلى القطع",
+    "vehicleNames": "{{name}} / {{nameAr}}",
+    "vehicleOption": "{{names}} ({{level}})",
+    "vehicleOptionYears": "{{names}} ({{level}} {{years}})",
+    "yearRange": "{{from}}–{{to}}",
+    "yearRangeFrom": "من {{from}}",
+    "yearRangeTo": "حتى {{to}}",
+    "partOption": "{{sku}} — {{name}}",
+    "priceListOption": "{{name}} ({{currency}})",
+    "pathSeparator": "›",
+    "vehiclePath": "تسلسل السيارة",
+    "archiveConfirm": "أرشفة هذه القطعة؟ ستختفي من القوائم ومن بحث البيع حتى تُستعاد.",
+    "showArchived": "عرض القطع المؤرشفة",
+    "removeSupersession": "إزالة البديل",
+    "removeCopiedFitments": "إزالة السيارات التي نُسخت إلى القطعة الجديدة أيضاً",
+    "removeSupersessionConfirm": "إزالة البديل {{sku}}؟"
   },
   "vehicles": {
     "title": "السيارات",
@@ -429,7 +556,8 @@
       "ignore": "تجاهل"
     },
     "mapsTo": "تعني",
-    "addAlias": "إضافة كلمة"
+    "addAlias": "إضافة كلمة",
+    "nameOfLevel": "الاسم ({{level}})"
   },
   "setup": {
     "title": "إعداد الكتالوج",
@@ -461,7 +589,7 @@
     "sheet": "الورقة",
     "rows": "{{count}} صف",
     "headerRow": "صف العناوين",
-    "headerHint": "اضغط على الصف الذي يحوي عناوين الأعمدة؛ البيانات تبدأ تحته.",
+    "headerHint": "اضغط على الصف الذي يحوي عناوين الأعمدة أو اكتب رقمه؛ البيانات تبدأ تحته.",
     "row": "الصف",
     "field": {
       "sku": "رمز الصنف",
@@ -532,6 +660,20 @@
       "applied": "تم الاستيراد",
       "discarded": "ملغى"
     },
-    "createdAt": "بدأ في"
+    "createdAt": "بدأ في",
+    "fileTooLarge": "الملف أكبر من {{max}}. قسّمه إلى ملفات أصغر أو احذف الأوراق التي لا تحتاجها.",
+    "range": "الصفوف {{from, number}}–{{to, number}} من {{total, number}}",
+    "rangeOpen": "الصفوف {{from, number}}–{{to, number}}",
+    "previousRows": "الصفوف السابقة",
+    "nextRows": "الصفوف التالية",
+    "filterByDecision": "عرض الصفوف حسب النتيجة",
+    "filterByIssue": "عرض الصفوف حسب المشكلة",
+    "columnOption": "{{letter}} — {{title}}",
+    "sheetOption": "{{name}} ({{rows}})",
+    "sheetTooLarge": "{{name}} (كبيرة جداً: أكثر من {{rows, number}} صف أو {{columns, number}} عمود)",
+    "noReadableSheet": "كل أوراق هذا الملف كبيرة جداً (أكثر من {{rows, number}} صف أو {{columns, number}} عمود). قسّمها إلى أوراق أصغر.",
+    "appliedSummary": "أسعار مسجّلة: {{prices, number}} · روابط سيارات مضافة: {{fitments, number}}",
+    "mapCodeTitle": "ربط الرمز {{code}}",
+    "mapSaved": "حُفظ من قبل: {{names}}. الحفظ مرة أخرى يضيف الباقي فقط."
   }
 }

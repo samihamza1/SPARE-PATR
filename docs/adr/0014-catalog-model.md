@@ -82,3 +82,25 @@ like:
 - Import (ADR 0016) creates parts with generated SKUs and leaves grade NULL unless the
   file has one.
 - Stock, cost and opening balances attach to `parts.id` in Sprint 4.
+
+## Addendum (2026-10-07, Sprints 1–3 review)
+
+These changes close findings of the review. They tighten the decision above.
+
+- **A supersession can be removed** with `POST /catalog/parts/:id/supersede/remove`.
+  - It sets `removed_at`, like the other links, and is audited as `part.supersede_remove`
+    with what was removed and an optional reason.
+  - The part can then be superseded again, by the right part.
+  - Fitments copied by a supersession record it (`fitments.supersession_id`). The removal
+    can soft-remove exactly those links (`removeCopiedFitments`), never the new part's
+    own ones.
+- **A replacement must be active**: superseding with an archived part is refused
+  (`catalog.archived`), since search never offers archived parts.
+- **An archived list cannot be the default** of its currency, because the currency
+  would be left without one (`catalog.archived`).
+- **"No price"** in the review list means no price in effect now, as search and the
+  part page show it. A part whose only price is scheduled for later is listed.
+- **Bulk edits** write one `part.bulk_update` entry per part actually changed, with its
+  previous grade, brand and category.
+- **Updates must change something**: PATCH bodies with no field are refused
+  (`update.nothing_to_set`) instead of reaching the database.

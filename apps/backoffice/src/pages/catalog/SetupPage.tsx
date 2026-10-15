@@ -26,6 +26,7 @@ import {
   usePriceLists,
 } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Form, useRequired } from '../../forms';
 
 function useSave(key: readonly unknown[]) {
   const queryClient = useQueryClient();
@@ -50,6 +51,7 @@ function Brands() {
   const save = useSave(catalogKeys.brands);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<string | null>(null);
+  const required = useRequired({ name, kind });
   return (
     <Stack>
       <Table>
@@ -80,11 +82,9 @@ function Brands() {
         </Table.Tbody>
       </Table>
       {can('catalog.manage') && (
-        <Group
-          component="form"
-          align="flex-end"
-          onSubmit={(e) => {
-            e.preventDefault();
+        <Form
+          onSubmit={() => {
+            if (!required.ok()) return;
             save.mutate(
               {
                 method: 'POST',
@@ -94,28 +94,33 @@ function Brands() {
               {
                 onSuccess: () => {
                   setName('');
+                  required.reset();
                 },
               },
             );
           }}
         >
-          <TextInput
-            label={t('fields.name')}
-            required
-            value={name}
-            onChange={(e) => {
-              setName(e.currentTarget.value);
-            }}
-          />
-          <Select
-            label={t('setup.kind')}
-            required
-            value={kind}
-            onChange={setKind}
-            data={BRAND_KINDS.map((k) => ({ value: k, label: t(`catalog.brandKind.${k}`) }))}
-          />
-          <Button type="submit">{t('setup.add')}</Button>
-        </Group>
+          <Group align="flex-end">
+            <TextInput
+              label={t('fields.name')}
+              required
+              value={name}
+              error={required.errors.name}
+              onChange={(e) => {
+                setName(e.currentTarget.value);
+              }}
+            />
+            <Select
+              label={t('setup.kind')}
+              required
+              value={kind}
+              onChange={setKind}
+              error={required.errors.kind}
+              data={BRAND_KINDS.map((k) => ({ value: k, label: t(`catalog.brandKind.${k}`) }))}
+            />
+            <Button type="submit">{t('setup.add')}</Button>
+          </Group>
+        </Form>
       )}
       <ErrorAlert error={brands.error ?? save.error} />
     </Stack>
@@ -130,6 +135,10 @@ function Categories() {
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);
+  const required = useRequired(
+    { name: nameAr.trim() === '' ? nameEn : nameAr },
+    { name: 'validation.name.required' },
+  );
   const name = (id: string | null) => {
     const c = categories.data?.find((x) => x.id === id);
     return c === undefined ? '' : categoryName(c, i18n.language);
@@ -151,11 +160,9 @@ function Categories() {
         </Table.Tbody>
       </Table>
       {can('catalog.manage') && (
-        <Group
-          component="form"
-          align="flex-end"
-          onSubmit={(e) => {
-            e.preventDefault();
+        <Form
+          onSubmit={() => {
+            if (!required.ok()) return;
             save.mutate(
               {
                 method: 'POST',
@@ -171,38 +178,42 @@ function Categories() {
                 onSuccess: () => {
                   setNameAr('');
                   setNameEn('');
+                  required.reset();
                 },
               },
             );
           }}
         >
-          <TextInput
-            label={t('catalog.nameAr')}
-            value={nameAr}
-            onChange={(e) => {
-              setNameAr(e.currentTarget.value);
-            }}
-          />
-          <TextInput
-            label={t('catalog.nameEn')}
-            dir="ltr"
-            value={nameEn}
-            onChange={(e) => {
-              setNameEn(e.currentTarget.value);
-            }}
-          />
-          <Select
-            label={t('setup.parent')}
-            clearable
-            value={parentId}
-            onChange={setParentId}
-            data={(categories.data ?? []).map((c) => ({
-              value: c.id,
-              label: categoryName(c, i18n.language),
-            }))}
-          />
-          <Button type="submit">{t('setup.add')}</Button>
-        </Group>
+          <Group align="flex-end">
+            <TextInput
+              label={t('catalog.nameAr')}
+              value={nameAr}
+              error={required.errors.name}
+              onChange={(e) => {
+                setNameAr(e.currentTarget.value);
+              }}
+            />
+            <TextInput
+              label={t('catalog.nameEn')}
+              dir="ltr"
+              value={nameEn}
+              onChange={(e) => {
+                setNameEn(e.currentTarget.value);
+              }}
+            />
+            <Select
+              label={t('setup.parent')}
+              clearable
+              value={parentId}
+              onChange={setParentId}
+              data={(categories.data ?? []).map((c) => ({
+                value: c.id,
+                label: categoryName(c, i18n.language),
+              }))}
+            />
+            <Button type="submit">{t('setup.add')}</Button>
+          </Group>
+        </Form>
       )}
       <ErrorAlert error={categories.error ?? save.error} />
     </Stack>
@@ -218,6 +229,7 @@ function PriceLists() {
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState<string | null>(null);
   const [isDefault, setIsDefault] = useState(false);
+  const required = useRequired({ name, currency });
   const manage = can('prices.manage');
   return (
     <Stack>
@@ -273,11 +285,9 @@ function PriceLists() {
         </Table.Tbody>
       </Table>
       {manage && (
-        <Group
-          component="form"
-          align="flex-end"
-          onSubmit={(e) => {
-            e.preventDefault();
+        <Form
+          onSubmit={() => {
+            if (!required.ok()) return;
             save.mutate(
               {
                 method: 'POST',
@@ -287,37 +297,42 @@ function PriceLists() {
               {
                 onSuccess: () => {
                   setName('');
+                  required.reset();
                 },
               },
             );
           }}
         >
-          <TextInput
-            label={t('fields.name')}
-            required
-            value={name}
-            onChange={(e) => {
-              setName(e.currentTarget.value);
-            }}
-          />
-          <Select
-            label={t('setup.currency')}
-            required
-            value={currency}
-            onChange={setCurrency}
-            data={(currencies.data ?? [])
-              .filter((c) => c.isActive)
-              .map((c) => ({ value: c.code, label: c.code }))}
-          />
-          <Checkbox
-            label={t('setup.default')}
-            checked={isDefault}
-            onChange={(e) => {
-              setIsDefault(e.currentTarget.checked);
-            }}
-          />
-          <Button type="submit">{t('setup.add')}</Button>
-        </Group>
+          <Group align="flex-end">
+            <TextInput
+              label={t('fields.name')}
+              required
+              value={name}
+              error={required.errors.name}
+              onChange={(e) => {
+                setName(e.currentTarget.value);
+              }}
+            />
+            <Select
+              label={t('setup.currency')}
+              required
+              value={currency}
+              onChange={setCurrency}
+              error={required.errors.currency}
+              data={(currencies.data ?? [])
+                .filter((c) => c.isActive)
+                .map((c) => ({ value: c.code, label: c.code }))}
+            />
+            <Checkbox
+              label={t('setup.default')}
+              checked={isDefault}
+              onChange={(e) => {
+                setIsDefault(e.currentTarget.checked);
+              }}
+            />
+            <Button type="submit">{t('setup.add')}</Button>
+          </Group>
+        </Form>
       )}
       <ErrorAlert error={lists.error ?? save.error} />
     </Stack>

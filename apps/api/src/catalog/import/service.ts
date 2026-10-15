@@ -15,6 +15,7 @@ import type {
   ParsedImportRow,
 } from '@autoparts/shared';
 import { sql } from 'kysely';
+import type { AuditActor } from '../../audit';
 import { ApiError, notFound } from '../../errors';
 import type { Trx } from '../mappers';
 import { currentPrices, iso } from '../mappers';
@@ -59,12 +60,22 @@ async function assertCostCurrency(trx: Trx, mapping: ImportMapping): Promise<voi
   if (found === undefined) throw new ApiError(400, 'request.invalid');
 }
 
-async function assertNotApplied(trx: Trx, sha256: Buffer, sheet: string): Promise<void> {
+/**
+ * A sheet of a file is applied once per target price list (same key as the unique index
+ * import_batches_applied_key): the same sheet may fill a second list from another column.
+ */
+async function assertNotApplied(
+  trx: Trx,
+  sha256: Buffer,
+  sheet: string,
+  priceListId: string | null | undefined,
+): Promise<void> {
   const applied = await trx
     .selectFrom('import_batches')
     .select('id')
     .where('file_sha256', '=', sha256)
     .where('sheet_name', '=', sheet)
+    .where(sql<string>`coalesce(mapping->>'priceListId', '')`, '=', priceListId ?? '')
     .where('status', '=', 'applied')
     .executeTakeFirst();
   if (applied !== undefined) throw new ApiError(409, 'import.already_applied');
@@ -86,7 +97,7 @@ export async function stageBatch(
   input: StageInput,
   rows: readonly ImportCell[][],
 ): Promise<void> {
-  await assertNotApplied(trx, input.sha256, input.sheet);
+  await assertNotApplied(trx, input.sha256, input.sheet, input.mapping.priceListId);
   await assertCostCurrency(trx, input.mapping);
   await priceSpec(trx, input.mapping);
 
@@ -282,11 +293,12 @@ async function aliasTargets(trx: Trx, codes: readonly string[]) {
   return map;
 }
 
-async function nextSkuNumber(trx: Trx, prefix: string): Promise<number> {
-  const { rows } = await sql<{ max: number | null }>`
-    SELECT max((regexp_match(upper(sku), ${`^${prefix}-(\\d+)$`}))[1]::bigint)::int AS max
+/** Next PREFIX-n number. numeric, not int: SKUs may carry long numbers (exact, no overflow). */
+async function nextSkuNumber(trx: Trx, prefix: string): Promise<bigint> {
+  const { rows } = await sql<{ max: string | null }>`
+    SELECT max((regexp_match(upper(sku), ${`^${prefix}-(\\d+)$`}))[1]::numeric)::text AS max
       FROM parts`.execute(trx);
-  return (rows[0]?.max ?? 0) + 1;
+  return BigInt(rows[0]?.max ?? '0') + 1n;
 }
 
 /**
@@ -296,7 +308,7 @@ async function nextSkuNumber(trx: Trx, prefix: string): Promise<number> {
  */
 export async function applyBatch(
   trx: Trx,
-  actor: { tenantId: string; userId: string },
+  actor: AuditActor,
   batchId: string,
   now: Date,
 ): Promise<ImportStats> {
@@ -306,20 +318,22 @@ export async function applyBatch(
     .select(['file_sha256', 'sheet_name'])
     .where('id', '=', batchId)
     .executeTakeFirstOrThrow();
-  await assertNotApplied(trx, meta.file_sha256, meta.sheet_name ?? '');
   const mapping = batch.mapping;
+  await assertNotApplied(trx, meta.file_sha256, meta.sheet_name ?? '', mapping.priceListId);
   const targets = await aliasTargets(trx, [
     ...new Set(analysed.flatMap((a) => a.parsed.vehicleCodeNorm ?? [])),
   ]);
 
-  let seq = 0;
+  let seq = 0n;
   if (mapping.skuPrefix != null) {
     // Continue after the highest PREFIX-n in the tenant or in this file's SKU column.
     const pattern = new RegExp(`^${mapping.skuPrefix}-(\\d+)$`);
     const inFile = analysed.map((a) =>
-      Number(pattern.exec(a.parsed.sku?.toUpperCase() ?? '')?.[1] ?? 0),
+      BigInt(pattern.exec(a.parsed.sku?.toUpperCase() ?? '')?.[1] ?? '0'),
     );
-    seq = Math.max(await nextSkuNumber(trx, mapping.skuPrefix), Math.max(0, ...inFile) + 1);
+    const fileNext = inFile.reduce((max, n) => (n > max ? n : max), 0n) + 1n;
+    const dbNext = await nextSkuNumber(trx, mapping.skuPrefix);
+    seq = dbNext > fileNext ? dbNext : fileNext;
   }
   const partByKey = new Map<string, string>();
   const parts: {
@@ -417,6 +431,33 @@ export async function applyBatch(
     const updates = pricesFor.filter((p) => p.update).map((p) => p.partId);
     const current = await currentPrices(trx, listId, updates, now);
     priceRows = pricesFor.filter((p) => !p.update || current.get(p.partId) !== p.price);
+    // Invariant 7: every price set by the import is audited like a manual price change.
+    await inChunks(priceRows, (chunk) =>
+      trx
+        .insertInto('audit_log')
+        .values(
+          chunk.map((p) => ({
+            id: newId(),
+            tenant_id: actor.tenantId,
+            occurred_at: now,
+            actor_user_id: actor.userId,
+            action: 'price.set',
+            entity_type: 'part',
+            entity_id: p.partId,
+            before: JSON.stringify({ priceListId: listId, price: current.get(p.partId) ?? null }),
+            after: JSON.stringify({
+              priceListId: listId,
+              price: p.price,
+              effectiveAt: now.toISOString(),
+              importBatchId: batchId,
+            }),
+            reason: null,
+            device_id: actor.deviceId ?? null,
+            request_id: actor.requestId ?? null,
+          })),
+        )
+        .execute(),
+    );
     await inChunks(priceRows, (chunk) =>
       trx
         .insertInto('part_prices')
@@ -569,9 +610,19 @@ export async function skipRows(trx: Trx, batchId: string, rowIds: string[], skip
   await analyseBatch(trx, batchId);
 }
 
+/**
+ * Discards a batch and blanks its staged cells: a wrongly chosen sheet (personal entries,
+ * debts) must not stay readable. Row numbers, issues and decisions remain. The cells are
+ * blanked before the status changes, because rows of discarded batches are frozen.
+ */
 export async function discardBatch(trx: Trx, batchId: string) {
   const batch = await loadBatchRow(trx, batchId, true);
   if (batch.status === 'applied' || batch.status === 'discarded') throw notEditable();
+  await trx
+    .updateTable('import_rows')
+    .set({ raw: '{}', parsed: '{}' })
+    .where('batch_id', '=', batchId)
+    .execute();
   await trx
     .updateTable('import_batches')
     .set({ status: 'discarded' })

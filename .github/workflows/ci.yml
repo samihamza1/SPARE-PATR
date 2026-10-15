@@ -32,8 +32,18 @@ jobs:
       - run: pnpm test:unit
       - run: pnpm build
       - name: Existing migrations are unchanged
-        if: github.event_name == 'pull_request'
-        run: scripts/check-migrations-immutable.sh "origin/${{ github.base_ref }}"
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base=""
+          if [ "$EVENT" = pull_request ]; then
+            base="origin/$BASE_REF"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            base="$BEFORE"
+          fi
+          scripts/check-migrations-immutable.sh "$base"
 
   db:
     name: Migrations, RLS and API integration tests (PostgreSQL 18)

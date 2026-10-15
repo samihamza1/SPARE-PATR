@@ -20,6 +20,25 @@ creates data by itself.
 (1) HALF_UP is the usual commercial rounding on receipts. It can be changed later in
 Settings → Business rules.
 
+## Before the first migration
+
+A new PostgreSQL server has none of the application's roles; the first migration fails
+without them (`role "autoparts_app" does not exist`).
+
+1. As a superuser, with strong passwords in the environment, create the roles and the
+   database:
+
+   ```sh
+   AUTOPARTS_OWNER_PASSWORD=… AUTOPARTS_APP_PASSWORD=… db/bootstrap/00-roles.sh
+   ```
+
+   It is idempotent. Use the usual libpq variables (`PGHOST`, `PGUSER`, …) to reach the
+   server.
+
+2. Point the tools at the right role:
+   - `DATABASE_URL` uses `autoparts_owner`: migrations and `tenant:create`.
+   - `APP_DATABASE_URL` uses `autoparts_app`: the API at runtime.
+
 ## Steps
 
 1. Migrate the database: `pnpm db:migrate`.

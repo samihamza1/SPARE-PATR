@@ -1,4 +1,12 @@
-import { IMPORT_FIELDS, IMPORT_MAX_FILE_BYTES, PART_NUMBER_KINDS, newId } from '@autoparts/shared';
+import {
+  IMPORT_FIELDS,
+  IMPORT_MAX_COLUMNS,
+  IMPORT_MAX_FILE_BYTES,
+  IMPORT_MAX_ROWS,
+  PART_NUMBER_KINDS,
+  importMappingSchema,
+  newId,
+} from '@autoparts/shared';
 import type {
   ImportBatch,
   ImportBatchDetail,
@@ -14,6 +22,7 @@ import {
   Card,
   FileInput,
   Group,
+  NumberInput,
   ScrollArea,
   Select,
   SimpleGrid,
@@ -25,13 +34,15 @@ import {
   Title,
 } from '@mantine/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
-import { api } from '../../api';
+import { ApiRequestError, api } from '../../api';
+import { useAuth } from '../../auth';
 import { useCurrencies, usePriceLists } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useFormatDateTime } from '../../format';
+import { Form, useRequired } from '../../forms';
 
 /** Spreadsheet column letters: 0 -> A, 25 -> Z, 26 -> AA. */
 export function columnLetter(index: number): string {
@@ -93,8 +104,19 @@ function History() {
   );
 }
 
+/** The upload limit in megabytes, in the user's language (e.g. "10 MB"). */
+export function maxFileSize(language: string): string {
+  return new Intl.NumberFormat(language, {
+    style: 'unit',
+    unit: 'megabyte',
+    maximumFractionDigits: 1,
+  }).format(IMPORT_MAX_FILE_BYTES / 1024 / 1024);
+}
+
 export function ImportsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { can } = useAuth();
+  const hintId = useId();
   const navigate = useNavigate();
   const priceLists = usePriceLists();
   const currencies = useCurrencies();
@@ -120,23 +142,27 @@ export function ImportsPage() {
     },
     onSuccess: (u) => {
       setUpload(u);
-      setSheetName(u.result.sheets[0]?.name ?? null);
+      // Sheets past the size limits are listed but cannot be chosen.
+      setSheetName(u.result.sheets.find((s) => !s.tooLarge)?.name ?? null);
       setHeaderRow(1);
       setColumns({});
       setStep(1);
     },
   });
 
+  const required = useRequired({
+    numberKind,
+    ...(columns.sellPrice !== undefined && { priceListId }),
+    ...(columns.cost !== undefined && { costCurrency }),
+    ...(columns.sku === undefined && { skuPrefix }),
+  });
+  // The shared mapping rules (a column for the part's identity, one field per column), checked
+  // here so the user sees them before the file is sent again.
+  const [mappingError, setMappingError] = useState<ApiRequestError | null>(null);
+
   const stage = useMutation({
-    mutationFn: () => {
+    mutationFn: (mapping: ImportMapping) => {
       if (upload === null || sheetName === null) throw new Error('no file');
-      const mapping: ImportMapping = {
-        columns,
-        numberKind: numberKind as ImportMapping['numberKind'],
-        priceListId: columns.sellPrice === undefined ? null : priceListId,
-        costCurrency: columns.cost === undefined ? null : costCurrency,
-        skuPrefix: skuPrefix.trim() === '' ? null : skuPrefix.trim().toUpperCase(),
-      };
       return api<ImportBatchDetail>('POST', '/catalog/imports', {
         id: newId(),
         fileName: upload.fileName,
@@ -153,16 +179,32 @@ export function ImportsPage() {
 
   const sheet = upload?.result.sheets.find((s) => s.name === sheetName);
   const header = sheet?.rows[headerRow - 1] ?? [];
-  const columnOptions = Array.from({ length: sheet?.columnCount ?? 0 }, (_, i) => ({
-    value: String(i),
-    label: `${columnLetter(i)} — ${header[i] ?? ''}`,
-  }));
+  const columnOptions = Array.from({ length: sheet?.columnCount ?? 0 }, (_, i) => {
+    const title = header[i] ?? '';
+    return {
+      value: String(i),
+      label:
+        title === ''
+          ? columnLetter(i)
+          : t('import.columnOption', { letter: columnLetter(i), title }),
+    };
+  });
+  const limits = { rows: IMPORT_MAX_ROWS, columns: IMPORT_MAX_COLUMNS };
+  const pickHeader = (row: number) => {
+    setHeaderRow(row);
+    setColumns({});
+  };
+  // Selling prices are set only by users who may change prices (prices.manage).
+  const fields = IMPORT_FIELDS.filter((f) => f !== 'sellPrice' || can('prices.manage'));
   const tooLarge = file !== null && file.size > IMPORT_MAX_FILE_BYTES;
 
   return (
     <Stack>
       <Title order={2}>{t('import.title')}</Title>
-      <Alert color="blue">{t('import.privacy')}</Alert>
+      {/* A standing notice, not an error: screen readers should not announce it as an alert. */}
+      <Alert color="blue" role="note">
+        {t('import.privacy')}
+      </Alert>
       <Stepper
         active={step}
         onStepClick={(s) => {
@@ -177,7 +219,9 @@ export function ImportsPage() {
               accept=".xlsx,.csv"
               value={file}
               onChange={setFile}
-              error={tooLarge ? t('errors.import.unreadable_file') : undefined}
+              error={
+                tooLarge ? t('import.fileTooLarge', { max: maxFileSize(i18n.language) }) : undefined
+              }
             />
             <Button
               disabled={file === null || tooLarge}
@@ -197,17 +241,42 @@ export function ImportsPage() {
             <Select
               label={t('import.sheet')}
               value={sheetName}
+              allowDeselect={false}
               onChange={(v) => {
                 setSheetName(v);
-                setHeaderRow(1);
-                setColumns({});
+                pickHeader(1);
               }}
               data={(upload?.result.sheets ?? []).map((s) => ({
                 value: s.name,
-                label: `${s.name} (${t('import.rows', { count: s.rowCount })})`,
+                label: s.tooLarge
+                  ? t('import.sheetTooLarge', { name: s.name, ...limits })
+                  : t('import.sheetOption', {
+                      name: s.name,
+                      rows: t('import.rows', { count: s.rowCount }),
+                    }),
+                disabled: s.tooLarge,
               }))}
             />
-            <Text size="sm">{t('import.headerHint')}</Text>
+            {upload !== null && sheet === undefined && (
+              <Alert color="red">{t('import.noReadableSheet', limits)}</Alert>
+            )}
+            <Text size="sm" id={hintId}>
+              {t('import.headerHint')}
+            </Text>
+            <NumberInput
+              label={t('import.headerRow')}
+              aria-describedby={hintId}
+              min={1}
+              max={Math.max(1, sheet?.rows.length ?? 1)}
+              allowDecimal={false}
+              allowNegative={false}
+              clampBehavior="strict"
+              value={headerRow}
+              onChange={(v) => {
+                if (typeof v === 'number' && v >= 1) pickHeader(v);
+              }}
+              w={160}
+            />
             <ScrollArea h={360}>
               <Table withTableBorder highlightOnHover dir="ltr" fz="xs">
                 <Table.Thead>
@@ -231,8 +300,7 @@ export function ImportsPage() {
                       }}
                       aria-selected={r + 1 === headerRow}
                       onClick={() => {
-                        setHeaderRow(r + 1);
-                        setColumns({});
+                        pickHeader(r + 1);
                       }}
                     >
                       <Table.Td>{r + 1}</Table.Td>
@@ -245,10 +313,8 @@ export function ImportsPage() {
               </Table>
             </ScrollArea>
             <Group>
-              <Text>
-                {t('import.headerRow')}: {headerRow}
-              </Text>
               <Button
+                disabled={sheet === undefined}
                 onClick={() => {
                   setStep(2);
                 }}
@@ -260,81 +326,104 @@ export function ImportsPage() {
         </Stepper.Step>
 
         <Stepper.Step label={t('import.steps.columns')}>
-          <Stack
-            mt="md"
-            component="form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              stage.mutate();
+          <Form
+            onSubmit={() => {
+              setMappingError(null);
+              if (!required.ok()) return;
+              const checked = importMappingSchema.safeParse({
+                columns,
+                numberKind,
+                priceListId: columns.sellPrice === undefined ? null : priceListId,
+                costCurrency: columns.cost === undefined ? null : costCurrency,
+                skuPrefix: skuPrefix.trim() === '' ? null : skuPrefix.trim().toUpperCase(),
+              });
+              if (checked.success) {
+                stage.mutate(checked.data);
+              } else {
+                const issues = checked.error.issues.map((i) => ({
+                  path: ['mapping', ...i.path].join('.'),
+                  message: i.message,
+                }));
+                setMappingError(new ApiRequestError(400, 'request.invalid', issues));
+              }
             }}
           >
-            <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              {IMPORT_FIELDS.map((field) => (
+            <Stack mt="md">
+              <SimpleGrid cols={{ base: 1, sm: 2 }}>
+                {fields.map((field) => (
+                  <Select
+                    key={field}
+                    label={t(`import.field.${field}`)}
+                    placeholder={t('import.notMapped')}
+                    clearable
+                    value={columns[field] === undefined ? null : String(columns[field])}
+                    onChange={(v) => {
+                      const others = Object.fromEntries(
+                        Object.entries(columns).filter(([f]) => f !== field),
+                      );
+                      setColumns(v === null ? others : { ...others, [field]: Number(v) });
+                    }}
+                    data={columnOptions}
+                  />
+                ))}
+              </SimpleGrid>
+              <SimpleGrid cols={{ base: 1, sm: 2 }}>
                 <Select
-                  key={field}
-                  label={t(`import.field.${field}`)}
-                  placeholder={t('import.notMapped')}
-                  clearable
-                  value={columns[field] === undefined ? null : String(columns[field])}
-                  onChange={(v) => {
-                    const others = Object.fromEntries(
-                      Object.entries(columns).filter(([f]) => f !== field),
-                    );
-                    setColumns(v === null ? others : { ...others, [field]: Number(v) });
+                  label={t('import.numberKind')}
+                  required
+                  value={numberKind}
+                  onChange={setNumberKind}
+                  error={required.errors.numberKind}
+                  data={PART_NUMBER_KINDS.map((k) => ({
+                    value: k,
+                    label: t(`catalog.numberKind.${k}`),
+                  }))}
+                />
+                {columns.sellPrice !== undefined && (
+                  <Select
+                    label={t('import.priceList')}
+                    required
+                    value={priceListId}
+                    onChange={setPriceListId}
+                    error={required.errors.priceListId}
+                    data={(priceLists.data ?? [])
+                      .filter((l) => l.archivedAt === null)
+                      .map((l) => ({
+                        value: l.id,
+                        label: t('catalog.priceListOption', { name: l.name, currency: l.currency }),
+                      }))}
+                  />
+                )}
+                {columns.cost !== undefined && (
+                  <Select
+                    label={t('import.costCurrency')}
+                    required
+                    value={costCurrency}
+                    onChange={setCostCurrency}
+                    error={required.errors.costCurrency}
+                    data={(currencies.data ?? []).map((c) => ({ value: c.code, label: c.code }))}
+                  />
+                )}
+                <TextInput
+                  label={t('import.skuPrefix')}
+                  description={t('import.skuPrefixHint')}
+                  required={columns.sku === undefined}
+                  dir="ltr"
+                  value={skuPrefix}
+                  error={required.errors.skuPrefix}
+                  onChange={(e) => {
+                    setSkuPrefix(e.currentTarget.value);
                   }}
-                  data={columnOptions}
                 />
-              ))}
-            </SimpleGrid>
-            <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              <Select
-                label={t('import.numberKind')}
-                required
-                value={numberKind}
-                onChange={setNumberKind}
-                data={PART_NUMBER_KINDS.map((k) => ({
-                  value: k,
-                  label: t(`catalog.numberKind.${k}`),
-                }))}
-              />
-              {columns.sellPrice !== undefined && (
-                <Select
-                  label={t('import.priceList')}
-                  required
-                  value={priceListId}
-                  onChange={setPriceListId}
-                  data={(priceLists.data ?? [])
-                    .filter((l) => l.archivedAt === null)
-                    .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
-                />
-              )}
-              {columns.cost !== undefined && (
-                <Select
-                  label={t('import.costCurrency')}
-                  required
-                  value={costCurrency}
-                  onChange={setCostCurrency}
-                  data={(currencies.data ?? []).map((c) => ({ value: c.code, label: c.code }))}
-                />
-              )}
-              <TextInput
-                label={t('import.skuPrefix')}
-                description={t('import.skuPrefixHint')}
-                required={columns.sku === undefined}
-                dir="ltr"
-                value={skuPrefix}
-                onChange={(e) => {
-                  setSkuPrefix(e.currentTarget.value);
-                }}
-              />
-            </SimpleGrid>
-            <ErrorAlert error={stage.error} />
-            <Group>
-              <Button type="submit" loading={stage.isPending} disabled={numberKind === null}>
-                {t('import.stage')}
-              </Button>
-            </Group>
-          </Stack>
+              </SimpleGrid>
+              <ErrorAlert error={mappingError ?? stage.error} />
+              <Group>
+                <Button type="submit" loading={stage.isPending}>
+                  {t('import.stage')}
+                </Button>
+              </Group>
+            </Stack>
+          </Form>
         </Stepper.Step>
       </Stepper>
       <History />

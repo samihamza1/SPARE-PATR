@@ -7,6 +7,8 @@ import { PART_NUMBER_KINDS } from './schemas';
 export const IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const IMPORT_MAX_ROWS = 20_000;
 export const IMPORT_MAX_COLUMNS = 100;
+/** Longest sheet name a batch keeps (a CSV's sheet is named after the file, cut to this). */
+export const IMPORT_MAX_SHEET_NAME = 100;
 
 /** Spreadsheet columns the import understands (ADR 0016). */
 export const IMPORT_FIELDS = [
@@ -81,7 +83,13 @@ export const importSheetPreviewSchema = z.object({
   columnCount: z.int(),
   /** The first rows as text, for choosing the header row and the columns. */
   rows: z.array(z.array(z.string().nullable())),
+  /**
+   * Past the row or column limits: listed with no rows (and counts of 0) instead of failing
+   * the whole file; staging it fails with import.too_many_rows.
+   */
+  tooLarge: z.boolean(),
 });
+export type ImportSheetPreview = z.infer<typeof importSheetPreviewSchema>;
 export const inspectImportResultSchema = z.object({
   sheets: z.array(importSheetPreviewSchema),
 });
@@ -138,7 +146,7 @@ export type ImportMapping = z.infer<typeof importMappingSchema>;
 export const createImportSchema = z.object({
   id: uuidV7Schema,
   ...fileSchema,
-  sheet: z.string().min(1).max(100),
+  sheet: z.string().min(1).max(IMPORT_MAX_SHEET_NAME),
   /** 1-based row holding the column titles; data starts on the next row. */
   headerRow: z.int().min(1).max(1000),
   mapping: importMappingSchema,

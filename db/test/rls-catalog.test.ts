@@ -26,8 +26,11 @@ const GLOBAL_TABLES = new Set([
   'tenant_directory',
 ]);
 
-/** Invariant 3: the app role may never UPDATE or DELETE these (journal/stock tables join later). */
-const APPEND_ONLY_TABLES = ['audit_log'];
+/**
+ * Invariant 3: tables that must be append-only. The checks below cover every table whose
+ * forbid_mutation trigger fires on UPDATE; this list makes sure none of these lost it.
+ */
+const REQUIRED_APPEND_ONLY = ['audit_log', 'part_prices'];
 
 const APP_ROLE = 'autoparts_app';
 
@@ -40,6 +43,7 @@ interface TableRow {
   rls_enabled: boolean;
   rls_forced: boolean;
   has_tenant_id: boolean;
+  tenant_id_not_null: boolean;
   owner: string;
 }
 
@@ -52,6 +56,10 @@ async function userTables(exec: Executor = db): Promise<TableRow[]> {
            EXISTS (SELECT 1 FROM pg_attribute a
                    WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped)
              AS has_tenant_id,
+           EXISTS (SELECT 1 FROM pg_attribute a
+                   WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped
+                     AND a.attnotnull)
+             AS tenant_id_not_null,
            pg_get_userbyid(c.relowner) AS owner
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -80,7 +88,15 @@ async function policies(exec: Executor = db): Promise<PolicyRow[]> {
   return rows;
 }
 
-const TENANT_PREDICATE = 'current_tenant_id()';
+/**
+ * The only predicates a policy may use, exactly as pg_policies prints them. Matching a
+ * substring would accept "current_tenant_id() IS NOT NULL", which opens every tenant.
+ */
+const TENANT_PREDICATE = '(tenant_id = current_tenant_id())';
+const TENANTS_PREDICATE = '(id = current_tenant_id())';
+const SHARED_READ_PREDICATE = '((tenant_id IS NULL) OR (tenant_id = current_tenant_id()))';
+const predicateFor = (table: string) =>
+  table === 'tenants' ? TENANTS_PREDICATE : TENANT_PREDICATE;
 
 // Each check returns its offenders; the tests below expect none, and the self-tests
 // build a broken object in a rolled-back transaction and expect the check to flag it.
@@ -98,6 +114,13 @@ async function tablesWithoutForcedRls(exec: Executor = db): Promise<string[]> {
     .map((t) => t.table);
 }
 
+/** A nullable tenant_id is how platform rows are stored: only shared tables may have one. */
+async function nullableTenantIds(exec: Executor = db): Promise<string[]> {
+  return (await userTables(exec))
+    .filter((t) => t.has_tenant_id && !t.tenant_id_not_null && !SHARED_TABLES.has(t.table))
+    .map((t) => t.table);
+}
+
 async function tablesWithoutTenantPolicy(exec: Executor = db): Promise<string[]> {
   const all = await policies(exec);
   return (await userTables(exec))
@@ -109,20 +132,21 @@ async function tablesWithoutTenantPolicy(exec: Executor = db): Promise<string[]>
             p.table === t.table &&
             p.permissive === 'PERMISSIVE' &&
             p.cmd === 'ALL' &&
-            p.qual?.includes(TENANT_PREDICATE) === true &&
-            p.with_check?.includes(TENANT_PREDICATE) === true,
+            p.qual === predicateFor(t.table) &&
+            p.with_check === predicateFor(t.table),
         ),
     )
     .map((t) => t.table);
 }
 
+/** Permissive policies are OR-ed: any one with another predicate widens what is visible. */
 async function leakyPolicies(exec: Executor = db): Promise<PolicyRow[]> {
   return (await policies(exec)).filter(
     (p) =>
       !SHARED_TABLES.has(p.table) &&
       p.permissive === 'PERMISSIVE' &&
-      (p.qual?.includes(TENANT_PREDICATE) !== true ||
-        (p.with_check !== null && !p.with_check.includes(TENANT_PREDICATE))),
+      (p.qual !== predicateFor(p.table) ||
+        (p.with_check !== null && p.with_check !== predicateFor(p.table))),
   );
 }
 
@@ -158,7 +182,8 @@ async function foreignKeysWithoutTenant(exec: Executor = db): Promise<string[]> 
     FROM pg_constraint con
     JOIN pg_namespace n ON n.oid = con.connamespace
     WHERE con.contype = 'f' AND n.nspname = 'public'
-      AND con.conrelid::regclass::text <> ALL (${[...SHARED_TABLES]}::text[])
+      -- References into shared tables have their own check (visibility triggers); a shared
+      -- table pointing into a tenant table must match tenant_id like any other.
       AND con.confrelid::regclass::text <> ALL (${[...SHARED_TABLES]}::text[])
       AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = con.conrelid
                   AND a.attname = 'tenant_id' AND NOT a.attisdropped)
@@ -191,13 +216,13 @@ async function sharedPolicyViolations(exec: Executor = db): Promise<string[]> {
         }
         continue;
       }
-      if (p.qual !== null && !p.qual.includes(TENANT_PREDICATE)) {
+      // Reading may include platform rows; everything else is the tenant's own rows only.
+      const readable =
+        p.cmd === 'SELECT' ? [SHARED_READ_PREDICATE, TENANT_PREDICATE] : [TENANT_PREDICATE];
+      if (p.qual !== null && !readable.includes(p.qual)) {
         problems.push(`${table}.${p.name}: USING ignores the tenant`);
       }
-      if (
-        p.with_check !== null &&
-        (!p.with_check.includes(TENANT_PREDICATE) || /IS NULL/i.test(p.with_check))
-      ) {
+      if (p.with_check !== null && p.with_check !== TENANT_PREDICATE) {
         problems.push(`${table}.${p.name}: WITH CHECK lets the app write platform rows`);
       }
       if (p.cmd !== 'SELECT' && p.with_check === null && p.cmd !== 'DELETE') {
@@ -211,11 +236,15 @@ async function sharedPolicyViolations(exec: Executor = db): Promise<string[]> {
 /**
  * A tenant table cannot use a composite FK into a shared table (platform rows have no
  * tenant_id), so it needs a trigger checking the target is global or its own (ADR 0013).
+ * The trigger must run BEFORE INSERT and UPDATE (of that column, or of any column), and
+ * its function must read that very column: a check of vehicle_id does not cover a second
+ * vehicle reference.
  */
 async function sharedReferencesWithoutVisibilityCheck(exec: Executor = db): Promise<string[]> {
   const { rows } = await sql<{ constraint: string }>`
     SELECT format('%s.%s', con.conrelid::regclass, con.conname) AS constraint
     FROM pg_constraint con
+    JOIN pg_attribute fk ON fk.attrelid = con.conrelid AND fk.attnum = con.conkey[1]
     WHERE con.contype = 'f'
       AND con.confrelid::regclass::text = ANY (${[...SHARED_TABLES]}::text[])
       AND con.conrelid <> con.confrelid
@@ -224,9 +253,22 @@ async function sharedReferencesWithoutVisibilityCheck(exec: Executor = db): Prom
         WHERE t.tgrelid = con.conrelid AND NOT t.tgisinternal
           AND f.proname LIKE 'check_visible_%'
           AND t.tgtype & 2 <> 0   -- BEFORE
-          AND t.tgtype & 4 <> 0)  -- INSERT
+          AND t.tgtype & 4 <> 0   -- INSERT
+          AND t.tgtype & 16 <> 0  -- UPDATE
+          AND (cardinality(t.tgattr::int2[]) = 0 OR fk.attnum = ANY (t.tgattr::int2[]))
+          AND f.prosrc ~ (${'NEW\\.'} || fk.attname || ${'\\M'}))
     ORDER BY 1`.execute(exec);
   return rows.map((r) => r.constraint);
+}
+
+/** Tables whose forbid_mutation trigger refuses UPDATE: the append-only ones (invariant 3). */
+async function appendOnlyTables(exec: Executor = db): Promise<string[]> {
+  const { rows } = await sql<{ table: string }>`
+    SELECT DISTINCT c.relname AS table
+    FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+    WHERE NOT t.tgisinternal AND t.tgfoid = 'forbid_mutation'::regproc AND t.tgtype & 16 <> 0
+    ORDER BY 1`.execute(exec);
+  return rows.map((r) => r.table);
 }
 
 /** Views run with their owner's rights unless security_invoker is set, which skips RLS checks for the caller. */
@@ -298,6 +340,10 @@ describe('tenant isolation catalog (invariant 4)', () => {
       await tablesWithoutForcedRls(),
       'tenant tables without ENABLE + FORCE ROW LEVEL SECURITY',
     ).toEqual([]);
+  });
+
+  it('gives tenant_id NOT NULL on every tenant table (only shared tables hold platform rows)', async () => {
+    expect(await nullableTenantIds(), 'nullable tenant_id outside SHARED_TABLES').toEqual([]);
   });
 
   it('gives every tenant table an ALL-commands policy on current_tenant_id()', async () => {
@@ -395,6 +441,26 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
     expect(leaky.map((p) => p.table)).toContain('users');
   });
 
+  it('flags a policy that merely mentions current_tenant_id()', async () => {
+    const leaky = await probe(
+      'CREATE POLICY lookup ON parts FOR SELECT USING (current_tenant_id() IS NOT NULL);',
+      leakyPolicies,
+    );
+    expect(leaky.map((p) => p.name)).toContain('lookup');
+  });
+
+  it('flags a tenant table with a nullable tenant_id and an IS NULL OR policy', async () => {
+    const ddl = `CREATE TABLE guard_probe (tenant_id uuid, id uuid NOT NULL PRIMARY KEY);
+      ALTER TABLE guard_probe ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE guard_probe FORCE ROW LEVEL SECURITY;
+      CREATE POLICY tenant_isolation ON guard_probe
+        USING (tenant_id IS NULL OR tenant_id = current_tenant_id())
+        WITH CHECK (tenant_id IS NULL OR tenant_id = current_tenant_id());`;
+    expect(await probe(ddl, nullableTenantIds)).toContain('guard_probe');
+    expect(await probe(ddl, tablesWithoutTenantPolicy)).toContain('guard_probe');
+    expect((await probe(ddl, leakyPolicies)).map((p) => p.table)).toContain('guard_probe');
+  });
+
   it('flags a multi-column index that does not start with tenant_id', async () => {
     const rows = await probe(
       'CREATE INDEX guard_probe_idx ON users (username, tenant_id);',
@@ -436,16 +502,58 @@ describe('tenant isolation catalog self-tests (each check can fail)', () => {
       sharedPolicyViolations,
     );
     expect(problems).toContain('vehicles.loose_write: WITH CHECK lets the app write platform rows');
+    const reads = await probe(
+      `CREATE POLICY loose_read ON vehicles FOR SELECT TO autoparts_app
+         USING (tenant_id IS NULL OR current_tenant_id() IS NOT NULL);`,
+      sharedPolicyViolations,
+    );
+    expect(reads).toContain('vehicles.loose_read: USING ignores the tenant');
   });
 
   it('flags a reference into a shared table without a visibility trigger', async () => {
+    const table = `CREATE TABLE guard_probe (tenant_id uuid NOT NULL, id uuid NOT NULL,
+      vehicle_id uuid REFERENCES vehicles (id), other_vehicle_id uuid REFERENCES vehicles (id),
+      note text, PRIMARY KEY (tenant_id, id));`;
+    const both = [
+      'guard_probe.guard_probe_other_vehicle_id_fkey',
+      'guard_probe.guard_probe_vehicle_id_fkey',
+    ];
+    expect(await probe(table, sharedReferencesWithoutVisibilityCheck)).toEqual(both);
+    // On INSERT only, an UPDATE could point the row at another tenant's vehicle.
     expect(
       await probe(
-        `CREATE TABLE guard_probe (tenant_id uuid NOT NULL, id uuid NOT NULL,
-           vehicle_id uuid REFERENCES vehicles (id), PRIMARY KEY (tenant_id, id));`,
+        `${table} CREATE TRIGGER guard_probe_check BEFORE INSERT ON guard_probe
+           FOR EACH ROW EXECUTE FUNCTION check_visible_vehicle();`,
         sharedReferencesWithoutVisibilityCheck,
       ),
-    ).toEqual(['guard_probe.guard_probe_vehicle_id_fkey']);
+    ).toEqual(both);
+    // UPDATE of another column does not cover the reference either.
+    expect(
+      await probe(
+        `${table} CREATE TRIGGER guard_probe_check BEFORE INSERT OR UPDATE OF note ON guard_probe
+           FOR EACH ROW EXECUTE FUNCTION check_visible_vehicle();`,
+        sharedReferencesWithoutVisibilityCheck,
+      ),
+    ).toEqual(both);
+    // The function reads vehicle_id only: the second reference stays unchecked.
+    expect(
+      await probe(
+        `${table} CREATE TRIGGER guard_probe_check
+           BEFORE INSERT OR UPDATE OF vehicle_id, other_vehicle_id ON guard_probe
+           FOR EACH ROW EXECUTE FUNCTION check_visible_vehicle();`,
+        sharedReferencesWithoutVisibilityCheck,
+      ),
+    ).toEqual(['guard_probe.guard_probe_other_vehicle_id_fkey']);
+  });
+
+  it('treats a table as append-only once its forbid_mutation trigger covers UPDATE', async () => {
+    expect(
+      await probe(
+        `${probeTable} CREATE TRIGGER guard_probe_forbid BEFORE UPDATE OR DELETE ON guard_probe
+           FOR EACH ROW EXECUTE FUNCTION forbid_mutation();`,
+        appendOnlyTables,
+      ),
+    ).toContain('guard_probe');
   });
 
   it('flags a SECURITY DEFINER function without a pinned search_path', async () => {
@@ -504,8 +612,12 @@ describe('database roles', () => {
     expect(rows).toEqual([]);
   });
 
+  it('keeps the required tables append-only (invariant 3)', async () => {
+    expect(await appendOnlyTables()).toEqual(expect.arrayContaining(REQUIRED_APPEND_ONLY));
+  });
+
   it('the app role cannot UPDATE append-only tables (invariant 3)', async () => {
-    for (const table of APPEND_ONLY_TABLES) {
+    for (const table of await appendOnlyTables()) {
       const { rows } = await sql<{ can_update: boolean }>`
         SELECT has_table_privilege(${APP_ROLE}, ${`public.${table}`}, 'UPDATE') AS can_update`.execute(
         db,
@@ -515,7 +627,7 @@ describe('database roles', () => {
   });
 
   it('append-only tables reject UPDATE, DELETE and TRUNCATE by trigger, for any role', async () => {
-    for (const table of APPEND_ONLY_TABLES) {
+    for (const table of await appendOnlyTables()) {
       const { rows } = await sql<{ events: string[] }>`
         SELECT array_agg(DISTINCT e ORDER BY e) AS events
         FROM pg_trigger t

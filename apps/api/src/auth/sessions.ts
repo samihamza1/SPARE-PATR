@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { tenantSettingsSchema, toPermissions, uuidSchema } from '@autoparts/shared';
 import type { DB } from '@autoparts/db';
 import { withTenant } from '@autoparts/db';
@@ -71,7 +72,8 @@ export async function createSession(
       created_at: input.now,
       last_seen_at: input.now,
       expires_at: expiresAt,
-      ip: input.ip,
+      // sessions.ip is inet; behind a misconfigured proxy request.ip can be any string.
+      ip: input.ip !== null && isIP(input.ip) !== 0 ? input.ip : null,
       user_agent: input.userAgent?.slice(0, 512) ?? null,
     })
     .execute();
@@ -119,6 +121,7 @@ export async function authenticate(
         's.user_id',
         's.device_id',
         's.secret_hash',
+        's.created_at',
         's.last_seen_at',
         's.expires_at',
         's.revoked_at',
@@ -137,8 +140,11 @@ export async function authenticate(
     ) {
       return null;
     }
-    const { idleMinutes } = sessionLimits(row.settings);
+    // Both limits come from the current settings, so lowering one shortens existing
+    // sessions; expires_at (the limit at sign-in) stays an upper bound.
+    const { idleMinutes, absoluteHours } = sessionLimits(row.settings);
     if (now >= row.expires_at) return null;
+    if (now.getTime() - row.created_at.getTime() >= absoluteHours * 3_600_000) return null;
     if (now.getTime() - row.last_seen_at.getTime() >= idleMinutes * 60_000) return null;
 
     if (now.getTime() - row.last_seen_at.getTime() >= TOUCH_INTERVAL_MS) {

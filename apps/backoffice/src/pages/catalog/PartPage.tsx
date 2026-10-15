@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Group,
   Select,
   SimpleGrid,
@@ -25,6 +26,7 @@ import {
   GradeBadge,
   PartPicker,
   Price,
+  VehiclePath,
   VehiclePicker,
   catalogKeys,
   categoryName,
@@ -35,6 +37,7 @@ import {
 } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useFormatDateTime } from '../../format';
+import { Form, useRequired } from '../../forms';
 
 const blankToNull = (v: string) => (v.trim() === '' ? null : v.trim());
 
@@ -50,15 +53,18 @@ function DetailsForm({ part, onSaved }: { part: PartDetail; onSaved: (p: PartDet
   const [categoryId, setCategoryId] = useState<string | null>(part.categoryId);
   const [unit, setUnit] = useState(part.unit);
   const [notes, setNotes] = useState(part.notes ?? '');
+  const required = useRequired(
+    { sku, name: nameAr.trim() === '' ? nameEn : nameAr, unit },
+    { name: 'validation.name.required' },
+  );
   const save = useMutation({
     mutationFn: (body: object) => api<PartDetail>('PATCH', `/catalog/parts/${part.id}`, body),
     onSuccess: onSaved,
   });
   return (
-    <Stack
-      component="form"
-      onSubmit={(e) => {
-        e.preventDefault();
+    <Form
+      onSubmit={() => {
+        if (!required.ok()) return;
         save.mutate({
           sku: sku.trim(),
           nameAr: blankToNull(nameAr),
@@ -71,89 +77,97 @@ function DetailsForm({ part, onSaved }: { part: PartDetail; onSaved: (p: PartDet
         });
       }}
     >
-      <SimpleGrid cols={{ base: 1, sm: 2 }}>
-        <TextInput
-          label={t('catalog.sku')}
-          dir="ltr"
-          required
-          value={sku}
+      <Stack>
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <TextInput
+            label={t('catalog.sku')}
+            dir="ltr"
+            required
+            value={sku}
+            error={required.errors.sku}
+            onChange={(e) => {
+              setSku(e.currentTarget.value);
+            }}
+          />
+          <Select
+            label={t('catalog.grade')}
+            clearable
+            placeholder={t('catalog.gradeLabel.none')}
+            value={grade}
+            onChange={setGrade}
+            data={QUALITY_GRADES.map((g) => ({ value: g, label: t(`catalog.gradeLabel.${g}`) }))}
+          />
+          <TextInput
+            label={t('catalog.nameAr')}
+            value={nameAr}
+            error={required.errors.name}
+            onChange={(e) => {
+              setNameAr(e.currentTarget.value);
+            }}
+          />
+          <TextInput
+            label={t('catalog.nameEn')}
+            dir="ltr"
+            value={nameEn}
+            onChange={(e) => {
+              setNameEn(e.currentTarget.value);
+            }}
+          />
+          <Select
+            label={t('catalog.brand')}
+            clearable
+            value={brandId}
+            onChange={setBrandId}
+            data={(brands.data ?? [])
+              .filter((b) => b.archivedAt === null || b.id === brandId)
+              .map((b) => ({ value: b.id, label: b.name }))}
+          />
+          <Select
+            label={t('catalog.category')}
+            clearable
+            value={categoryId}
+            onChange={setCategoryId}
+            data={(categories.data ?? [])
+              .filter((c) => c.archivedAt === null || c.id === categoryId)
+              .map((c) => ({ value: c.id, label: categoryName(c, i18n.language) }))}
+          />
+          <TextInput
+            label={t('catalog.unit')}
+            dir="ltr"
+            required
+            value={unit}
+            error={required.errors.unit}
+            onChange={(e) => {
+              setUnit(e.currentTarget.value);
+            }}
+          />
+        </SimpleGrid>
+        <Textarea
+          label={t('catalog.notes')}
+          value={notes}
           onChange={(e) => {
-            setSku(e.currentTarget.value);
+            setNotes(e.currentTarget.value);
           }}
         />
-        <Select
-          label={t('catalog.grade')}
-          clearable
-          placeholder={t('catalog.gradeLabel.none')}
-          value={grade}
-          onChange={setGrade}
-          data={QUALITY_GRADES.map((g) => ({ value: g, label: t(`catalog.gradeLabel.${g}`) }))}
-        />
-        <TextInput
-          label={t('catalog.nameAr')}
-          value={nameAr}
-          onChange={(e) => {
-            setNameAr(e.currentTarget.value);
-          }}
-        />
-        <TextInput
-          label={t('catalog.nameEn')}
-          dir="ltr"
-          value={nameEn}
-          onChange={(e) => {
-            setNameEn(e.currentTarget.value);
-          }}
-        />
-        <Select
-          label={t('catalog.brand')}
-          clearable
-          value={brandId}
-          onChange={setBrandId}
-          data={(brands.data ?? [])
-            .filter((b) => b.archivedAt === null || b.id === brandId)
-            .map((b) => ({ value: b.id, label: b.name }))}
-        />
-        <Select
-          label={t('catalog.category')}
-          clearable
-          value={categoryId}
-          onChange={setCategoryId}
-          data={(categories.data ?? [])
-            .filter((c) => c.archivedAt === null || c.id === categoryId)
-            .map((c) => ({ value: c.id, label: categoryName(c, i18n.language) }))}
-        />
-        <TextInput
-          label={t('catalog.unit')}
-          dir="ltr"
-          value={unit}
-          onChange={(e) => {
-            setUnit(e.currentTarget.value);
-          }}
-        />
-      </SimpleGrid>
-      <Textarea
-        label={t('catalog.notes')}
-        value={notes}
-        onChange={(e) => {
-          setNotes(e.currentTarget.value);
-        }}
-      />
-      <ErrorAlert error={save.error} />
-      <Group>
-        <Button type="submit" loading={save.isPending}>
-          {t('common.save')}
-        </Button>
-        <Button
-          variant="light"
-          color={part.archivedAt === null ? 'red' : 'green'}
-          onClick={() => {
-            save.mutate({ archived: part.archivedAt === null });
-          }}
-        >
-          {part.archivedAt === null ? t('catalog.archive') : t('catalog.restore')}
-        </Button>
-      </Group>
-    </Stack>
+        <ErrorAlert error={save.error} />
+        <Group>
+          <Button type="submit" loading={save.isPending}>
+            {t('common.save')}
+          </Button>
+          <Button
+            variant="light"
+            color={part.archivedAt === null ? 'red' : 'green'}
+            onClick={() => {
+              // Archiving hides the part from lists and sales search; ask first.
+              if (part.archivedAt === null && !window.confirm(t('catalog.archiveConfirm'))) return;
+              save.mutate({ archived: part.archivedAt === null });
+            }}
+          >
+            {part.archivedAt === null ? t('catalog.archive') : t('catalog.restore')}
+          </Button>
+        </Group>
+      </Stack>
+    </Form>
   );
 }
 
@@ -170,15 +184,17 @@ function PricesCard({ part }: { part: PartDetail }) {
   });
   const [listId, setListId] = useState<string | null>(null);
   const [price, setPrice] = useState('');
+  const required = useRequired({ listId, price });
   const set = useMutation({
-    mutationFn: () =>
-      api('POST', `/catalog/price-lists/${listId ?? ''}/prices`, {
+    mutationFn: (list: string) =>
+      api('POST', `/catalog/price-lists/${list}/prices`, {
         id: newId(),
         partId: part.id,
         price: price.trim(),
       }),
     onSuccess: async () => {
       setPrice('');
+      required.reset();
       await queryClient.invalidateQueries({ queryKey: historyKey });
       await queryClient.invalidateQueries({ queryKey: catalogKeys.part(part.id) });
     },
@@ -200,38 +216,38 @@ function PricesCard({ part }: { part: PartDetail }) {
         </Table.Tbody>
       </Table>
       {can('prices.manage') && (
-        <Group
-          component="form"
-          align="flex-end"
-          mt="sm"
-          onSubmit={(e) => {
-            e.preventDefault();
-            set.mutate();
+        <Form
+          onSubmit={() => {
+            if (required.ok() && listId !== null) set.mutate(listId);
           }}
         >
-          <Select
-            label={t('catalog.priceList')}
-            required
-            value={listId}
-            onChange={setListId}
-            data={(lists.data ?? [])
-              .filter((l) => l.archivedAt === null)
-              .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
-          />
-          <TextInput
-            label={t('catalog.price')}
-            required
-            dir="ltr"
-            inputMode="decimal"
-            value={price}
-            onChange={(e) => {
-              setPrice(e.currentTarget.value);
-            }}
-          />
-          <Button type="submit" loading={set.isPending}>
-            {t('catalog.setPrice')}
-          </Button>
-        </Group>
+          <Group align="flex-end" mt="sm">
+            <Select
+              label={t('catalog.priceList')}
+              required
+              value={listId}
+              onChange={setListId}
+              error={required.errors.listId}
+              data={(lists.data ?? [])
+                .filter((l) => l.archivedAt === null)
+                .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
+            />
+            <TextInput
+              label={t('catalog.price')}
+              required
+              dir="ltr"
+              inputMode="decimal"
+              value={price}
+              error={required.errors.price}
+              onChange={(e) => {
+                setPrice(e.currentTarget.value);
+              }}
+            />
+            <Button type="submit" loading={set.isPending}>
+              {t('catalog.setPrice')}
+            </Button>
+          </Group>
+        </Form>
       )}
       <ErrorAlert error={set.error ?? history.error} />
       <Text fw={600} mt="md">
@@ -255,10 +271,12 @@ function PricesCard({ part }: { part: PartDetail }) {
               </Table.Td>
               <Table.Td>{formatDateTime(h.effectiveAt)}</Table.Td>
               <Table.Td>
-                {formatDateTime(h.recordedAt)} ·{' '}
-                <Badge variant="light" size="sm">
-                  {t(`catalog.source.${h.source}`)}
-                </Badge>
+                <Group gap="xs">
+                  {formatDateTime(h.recordedAt)}
+                  <Badge variant="light" size="sm">
+                    {t(`catalog.source.${h.source}`)}
+                  </Badge>
+                </Group>
               </Table.Td>
             </Table.Tr>
           ))}
@@ -295,11 +313,17 @@ export function PartPage() {
   const [number, setNumber] = useState('');
   const [kind, setKind] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  // A wrong replacement usually brought wrong vehicles with it.
+  const [removeCopied, setRemoveCopied] = useState(true);
+  const numberRequired = useRequired({ number, kind });
 
   const update = (p: PartDetail) => {
     queryClient.setQueryData(key, p);
     void queryClient.invalidateQueries({ queryKey: catalogKeys.parts });
   };
+  // The details form starts again from the server only after its own save, so a number,
+  // vehicle or price added meanwhile does not discard what the user is typing.
+  const [formVersion, setFormVersion] = useState(0);
   const act = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: object }) =>
       api<PartDetail>('POST', `/catalog/parts/${id}${path}`, body ?? {}),
@@ -307,6 +331,7 @@ export function PartPage() {
       update(p);
       setNumber('');
       setReason('');
+      numberRequired.reset();
     },
   });
 
@@ -330,7 +355,14 @@ export function PartPage() {
       <Card withBorder>
         <Title order={4}>{t('catalog.details')}</Title>
         {manage ? (
-          <DetailsForm key={JSON.stringify(p)} part={p} onSaved={update} />
+          <DetailsForm
+            key={`${p.id}:${String(formVersion)}`}
+            part={p}
+            onSaved={(saved) => {
+              update(saved);
+              setFormVersion((v) => v + 1);
+            }}
+          />
         ) : (
           <Text>
             {p.nameAr} {p.nameEn}
@@ -365,38 +397,40 @@ export function PartPage() {
           </Table.Tbody>
         </Table>
         {manage && (
-          <Group
-            component="form"
-            align="flex-end"
-            onSubmit={(e) => {
-              e.preventDefault();
+          <Form
+            onSubmit={() => {
+              if (!numberRequired.ok()) return;
               act.mutate({
                 path: '/numbers',
                 body: { id: newId(), number: number.trim(), kind },
               });
             }}
           >
-            <TextInput
-              label={t('catalog.number')}
-              required
-              dir="ltr"
-              value={number}
-              onChange={(e) => {
-                setNumber(e.currentTarget.value);
-              }}
-            />
-            <Select
-              label={t('catalog.kind')}
-              required
-              value={kind}
-              onChange={setKind}
-              data={PART_NUMBER_KINDS.map((k) => ({
-                value: k,
-                label: t(`catalog.numberKind.${k}`),
-              }))}
-            />
-            <Button type="submit">{t('catalog.addNumber')}</Button>
-          </Group>
+            <Group align="flex-end">
+              <TextInput
+                label={t('catalog.number')}
+                required
+                dir="ltr"
+                value={number}
+                error={numberRequired.errors.number}
+                onChange={(e) => {
+                  setNumber(e.currentTarget.value);
+                }}
+              />
+              <Select
+                label={t('catalog.kind')}
+                required
+                value={kind}
+                onChange={setKind}
+                error={numberRequired.errors.kind}
+                data={PART_NUMBER_KINDS.map((k) => ({
+                  value: k,
+                  label: t(`catalog.numberKind.${k}`),
+                }))}
+              />
+              <Button type="submit">{t('catalog.addNumber')}</Button>
+            </Group>
+          </Form>
         )}
       </Card>
 
@@ -406,7 +440,9 @@ export function PartPage() {
           <Table.Tbody>
             {p.fitments.map((f) => (
               <Table.Tr key={f.id}>
-                <Table.Td>{f.path.join(' › ')}</Table.Td>
+                <Table.Td>
+                  <VehiclePath path={f.path} />
+                </Table.Td>
                 <Table.Td>{f.note}</Table.Td>
                 <Table.Td>
                   {manage && (
@@ -473,6 +509,38 @@ export function PartPage() {
           <Group>
             <Text fw={600}>{t('catalog.supersededBy')}:</Text>
             <PartLink part={p.supersededBy} />
+          </Group>
+        )}
+        {manage && p.supersededBy !== null && (
+          <Group align="flex-end">
+            <TextInput
+              label={t('catalog.reason')}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.currentTarget.value);
+              }}
+            />
+            <Checkbox
+              label={t('catalog.removeCopiedFitments')}
+              checked={removeCopied}
+              onChange={(e) => {
+                setRemoveCopied(e.currentTarget.checked);
+              }}
+            />
+            <Button
+              variant="light"
+              color="red"
+              onClick={() => {
+                const sku = p.supersededBy?.sku ?? '';
+                if (!window.confirm(t('catalog.removeSupersessionConfirm', { sku }))) return;
+                act.mutate({
+                  path: '/supersede/remove',
+                  body: { removeCopiedFitments: removeCopied, reason: blankToNull(reason) },
+                });
+              }}
+            >
+              {t('catalog.removeSupersession')}
+            </Button>
           </Group>
         )}
         {p.supersedes.map((x) => (

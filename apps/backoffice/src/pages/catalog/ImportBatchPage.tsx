@@ -23,12 +23,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
-import { api } from '../../api';
+import { ApiRequestError, api } from '../../api';
 import { useAuth } from '../../auth';
-import { VehiclePicker, catalogKeys, categoryName, useCategories } from '../../catalog/common';
+import {
+  RemovableBadge,
+  VehiclePicker,
+  catalogKeys,
+  categoryName,
+  useCategories,
+} from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
 
 type Code = ImportBatchDetail['vehicleCodes'][number];
+
+/** Preview rows per page (the API's largest page). */
+const ROWS_PAGE = 500;
 
 const DECISION_COLORS: Record<ImportDecision, string> = {
   create: 'green',
@@ -57,13 +66,24 @@ function MapCode({
   const categories = useCategories();
   const [target, setTarget] = useState<string | null>('vehicle');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  // Vehicles whose alias is already saved: a retry after a partial failure skips them.
+  const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const save = useMutation({
     mutationFn: async () => {
       const post = (body: object) =>
         api('POST', '/catalog/vehicle-aliases', { id: newId(), alias: code.code, target, ...body });
       if (target === 'vehicle') {
-        for (const v of vehicles) await post({ vehicleId: v.id });
+        for (const v of vehicles) {
+          if (saved.has(v.id)) continue;
+          try {
+            await post({ vehicleId: v.id });
+          } catch (err) {
+            // The code already means this vehicle (an earlier attempt whose answer was lost).
+            if (!(err instanceof ApiRequestError && err.code === 'resource.conflict')) throw err;
+          }
+          setSaved((s) => new Set(s).add(v.id));
+        }
       } else if (target === 'category') {
         await post({ categoryId });
       } else {
@@ -72,16 +92,23 @@ function MapCode({
     },
     onSuccess: onSaved,
   });
+  const savedVehicles = vehicles.filter((v) => saved.has(v.id));
   const ready =
     (target === 'vehicle' && vehicles.length > 0) ||
     (target === 'category' && categoryId !== null) ||
     target === 'ignore';
   return (
-    <Modal opened onClose={onClose} title={`${t('import.mapCode')}: ${code.code}`}>
+    <Modal
+      opened
+      // Some vehicles were saved before a failure: the preview must count them.
+      onClose={saved.size > 0 ? onSaved : onClose}
+      title={t('import.mapCodeTitle', { code: code.code })}
+    >
       <Stack>
         <Select
           label={t('import.mapping')}
           value={target}
+          disabled={saved.size > 0}
           onChange={setTarget}
           data={(['vehicle', 'category', 'ignore'] as const).map((x) => ({
             value: x,
@@ -91,18 +118,31 @@ function MapCode({
         {target === 'vehicle' && (
           <>
             <Group gap="xs">
-              {vehicles.map((v) => (
-                <Badge
-                  key={v.id}
-                  variant="light"
-                  onClick={() => {
-                    setVehicles(vehicles.filter((x) => x.id !== v.id));
-                  }}
-                >
-                  {v.name} ×
-                </Badge>
-              ))}
+              {vehicles.map((v) =>
+                saved.has(v.id) ? (
+                  <Badge key={v.id} variant="light" color="green">
+                    {v.name}
+                  </Badge>
+                ) : (
+                  <RemovableBadge
+                    key={v.id}
+                    label={v.name}
+                    onRemove={() => {
+                      setVehicles(vehicles.filter((x) => x.id !== v.id));
+                    }}
+                  />
+                ),
+              )}
             </Group>
+            {savedVehicles.length > 0 && (
+              <Text size="sm" c="dimmed">
+                {t('import.mapSaved', {
+                  names: new Intl.ListFormat(i18n.language).format(
+                    savedVehicles.map((v) => v.name),
+                  ),
+                })}
+              </Text>
+            )}
             <VehiclePicker
               onPick={(v) => {
                 if (!vehicles.some((x) => x.id === v.id)) setVehicles([...vehicles, v]);
@@ -149,16 +189,25 @@ export function ImportBatchPage() {
   const [issue, setIssue] = useState<ImportIssue | null>(null);
   const [decision, setDecision] = useState<ImportDecision | null>(null);
   const [mapping, setMapping] = useState<Code | null>(null);
-  const rowsKey = [...key, 'rows', issue, decision] as const;
+  // Keyset paging: the last row number of each earlier page; empty on the first page.
+  const [cursors, setCursors] = useState<number[]>([]);
+  const after = cursors.at(-1);
+  const rowsKey = [...key, 'rows', issue, decision, after ?? 0] as const;
   const rows = useQuery({
     queryKey: rowsKey,
     queryFn: () => {
-      const params = new URLSearchParams({ limit: '500' });
+      const params = new URLSearchParams({ limit: String(ROWS_PAGE) });
       if (issue !== null) params.set('issue', issue);
       if (decision !== null) params.set('decision', decision);
+      if (after !== undefined) params.set('after', String(after));
       return api<ImportRow[]>('GET', `/catalog/imports/${id}/rows?${params.toString()}`);
     },
   });
+  const filter = (next: { issue: ImportIssue | null; decision: ImportDecision | null }) => {
+    setIssue(next.issue);
+    setDecision(next.decision);
+    setCursors([]);
+  };
 
   const refresh = async (detail?: ImportBatchDetail) => {
     if (detail !== undefined) queryClient.setQueryData(key, detail);
@@ -178,6 +227,19 @@ export function ImportBatchPage() {
   const b = batch.data;
   const editable = b.status === 'draft' || b.status === 'previewed';
   const importing = (b.stats?.rows ?? 0) - (b.stats?.byDecision.skip ?? 0);
+  // How many rows the current filter matches, when the summary says (not for two filters).
+  const total =
+    issue === null && decision === null
+      ? (b.stats?.rows ?? 0)
+      : decision === null && issue !== null
+        ? (b.stats?.byIssue[issue] ?? 0)
+        : issue === null && decision !== null
+          ? (b.stats?.byDecision[decision] ?? 0)
+          : undefined;
+  const page = rows.data ?? [];
+  const from = cursors.length * ROWS_PAGE + 1;
+  const to = cursors.length * ROWS_PAGE + page.length;
+  const hasNext = page.length === ROWS_PAGE && (total === undefined || to < total);
 
   return (
     <Stack>
@@ -199,17 +261,20 @@ export function ImportBatchPage() {
 
       <Card withBorder>
         <Title order={4}>{t('import.summary')}</Title>
-        <Group gap="xs" mt="xs">
+        <Group gap="xs" mt="xs" role="group" aria-label={t('import.filterByDecision')}>
           <Text>{t('import.rows', { count: b.stats?.rows ?? 0 })}:</Text>
           {IMPORT_DECISIONS.map((d) =>
             (b.stats?.byDecision[d] ?? 0) === 0 ? null : (
               <Badge
                 key={d}
+                component="button"
+                type="button"
+                aria-pressed={decision === d}
                 color={DECISION_COLORS[d]}
                 variant={decision === d ? 'filled' : 'light'}
                 style={{ cursor: 'pointer' }}
                 onClick={() => {
-                  setDecision(decision === d ? null : d);
+                  filter({ issue, decision: decision === d ? null : d });
                 }}
               >
                 {t(`import.decision.${d}`)}: {b.stats?.byDecision[d]}
@@ -217,15 +282,18 @@ export function ImportBatchPage() {
             ),
           )}
         </Group>
-        <Group gap="xs" mt="xs">
+        <Group gap="xs" mt="xs" role="group" aria-label={t('import.filterByIssue')}>
           {Object.entries(b.stats?.byIssue ?? {}).map(([i, count]) => (
             <Badge
               key={i}
+              component="button"
+              type="button"
+              aria-pressed={issue === i}
               color={issueColor(i as ImportIssue)}
               variant={issue === i ? 'filled' : 'light'}
               style={{ cursor: 'pointer' }}
               onClick={() => {
-                setIssue(issue === i ? null : (i as ImportIssue));
+                filter({ issue: issue === i ? null : (i as ImportIssue), decision });
               }}
             >
               {t(`import.issue.${i}`)}: {count}
@@ -235,8 +303,10 @@ export function ImportBatchPage() {
         {b.status === 'applied' && (
           <Group mt="sm">
             <Text>
-              {t('import.pricesSet')}: {b.stats?.pricesSet ?? 0} · {t('import.fitmentsAdded')}:{' '}
-              {b.stats?.fitmentsAdded ?? 0}
+              {t('import.appliedSummary', {
+                prices: b.stats?.pricesSet ?? 0,
+                fitments: b.stats?.fitmentsAdded ?? 0,
+              })}
             </Text>
             <Anchor component={Link} to="/catalog/parts">
               {t('import.openParts')}
@@ -339,8 +409,7 @@ export function ImportBatchPage() {
               size="xs"
               variant="subtle"
               onClick={() => {
-                setIssue(null);
-                setDecision(null);
+                filter({ issue: null, decision: null });
               }}
             >
               {t('import.allRows')}
@@ -360,7 +429,7 @@ export function ImportBatchPage() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {rows.data?.map((r) => (
+            {page.map((r) => (
               <Table.Tr key={r.id} data-testid={`import-row-${String(r.rowNumber)}`}>
                 <Table.Td>{r.rowNumber}</Table.Td>
                 <Table.Td dir="ltr">{r.parsed.partNumber}</Table.Td>
@@ -413,6 +482,39 @@ export function ImportBatchPage() {
             ))}
           </Table.Tbody>
         </Table>
+        <Group justify="space-between" mt="sm">
+          <Text size="sm" c="dimmed" aria-live="polite">
+            {page.length > 0 &&
+              (total === undefined
+                ? t('import.rangeOpen', { from, to })
+                : t('import.range', { from, to, total }))}
+          </Text>
+          <Group gap="xs">
+            {cursors.length > 0 && (
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => {
+                  setCursors(cursors.slice(0, -1));
+                }}
+              >
+                {t('import.previousRows')}
+              </Button>
+            )}
+            {hasNext && (
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => {
+                  const last = page.at(-1);
+                  if (last !== undefined) setCursors([...cursors, last.rowNumber]);
+                }}
+              >
+                {t('import.nextRows')}
+              </Button>
+            )}
+          </Group>
+        </Group>
       </Card>
 
       {mapping !== null && (

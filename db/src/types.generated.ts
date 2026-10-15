@@ -84,6 +84,7 @@ export interface Fitments {
   note: string | null;
   part_id: string;
   removed_at: Timestamp | null;
+  supersession_id: string | null;
   tenant_id: string;
   vehicle_id: string;
 }

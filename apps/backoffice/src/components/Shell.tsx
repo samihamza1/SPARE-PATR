@@ -1,9 +1,12 @@
 import type { Permission } from '@autoparts/shared';
 import { AppShell, Burger, Button, Group, NavLink, Stack, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, NavLink as RouterLink } from 'react-router';
 import { LANGUAGE_KEY, useAuth } from '../auth';
+import { errorText } from './ErrorAlert';
 
 interface NavItem {
   to: string;
@@ -46,6 +49,24 @@ export function Shell() {
   const { t } = useTranslation();
   const { me, can, logout } = useAuth();
   const [opened, { toggle, close }] = useDisclosure();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signOut = async () => {
+    setSigningOut(true);
+    try {
+      // RequireAuth sends us to the login page once the session is gone.
+      await logout();
+    } catch (error) {
+      notifications.show({
+        color: 'red',
+        title: t('auth.logoutFailed'),
+        message: errorText(t, error),
+        autoClose: false,
+      });
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
     <AppShell
@@ -73,9 +94,9 @@ export function Shell() {
             <LanguageSwitch />
             <Button
               variant="light"
+              loading={signingOut}
               onClick={() => {
-                // RequireAuth sends us to the login page once the session is gone.
-                void logout();
+                void signOut();
               }}
             >
               {t('auth.logout')}

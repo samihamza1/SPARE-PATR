@@ -10,6 +10,7 @@ import {
   SegmentedControl,
   Select,
   Stack,
+  Switch,
   Table,
   Text,
   TextInput,
@@ -24,6 +25,7 @@ import { api } from '../../api';
 import { useAuth } from '../../auth';
 import { GradeBadge, catalogKeys, partName } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { Form, useRequired } from '../../forms';
 
 const PAGE = 100;
 type Review = (typeof NEEDS_REVIEW)[number] | 'all';
@@ -37,6 +39,15 @@ function NewPartModal({ onClose }: { onClose: () => void }) {
   const [grade, setGrade] = useState<string | null>(null);
   const [number, setNumber] = useState('');
   const [kind, setKind] = useState<string | null>(null);
+  const required = useRequired(
+    {
+      sku,
+      name: nameAr.trim() === '' ? nameEn : nameAr,
+      // A typed number is never dropped: it needs its kind.
+      ...(number.trim() !== '' && { kind }),
+    },
+    { name: 'validation.name.required' },
+  );
   const create = useMutation({
     mutationFn: () =>
       api<PartDetail>('POST', '/catalog/parts', {
@@ -45,10 +56,7 @@ function NewPartModal({ onClose }: { onClose: () => void }) {
         nameAr: nameAr.trim() === '' ? null : nameAr.trim(),
         nameEn: nameEn.trim() === '' ? null : nameEn.trim(),
         qualityGrade: grade,
-        numbers:
-          number.trim() === '' || kind === null
-            ? []
-            : [{ id: newId(), number: number.trim(), kind }],
+        numbers: number.trim() === '' ? [] : [{ id: newId(), number: number.trim(), kind }],
       }),
     onSuccess: (part) => {
       void navigate(`/catalog/parts/${part.id}`);
@@ -56,70 +64,76 @@ function NewPartModal({ onClose }: { onClose: () => void }) {
   });
   return (
     <Modal opened onClose={onClose} title={t('catalog.newPart')}>
-      <Stack
-        component="form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          create.mutate();
+      <Form
+        onSubmit={() => {
+          if (required.ok()) create.mutate();
         }}
       >
-        <TextInput
-          label={t('catalog.sku')}
-          required
-          dir="ltr"
-          value={sku}
-          onChange={(e) => {
-            setSku(e.currentTarget.value);
-          }}
-        />
-        <TextInput
-          label={t('catalog.nameAr')}
-          value={nameAr}
-          onChange={(e) => {
-            setNameAr(e.currentTarget.value);
-          }}
-        />
-        <TextInput
-          label={t('catalog.nameEn')}
-          dir="ltr"
-          value={nameEn}
-          onChange={(e) => {
-            setNameEn(e.currentTarget.value);
-          }}
-        />
-        <Text size="xs" c="dimmed">
-          {t('catalog.nameRequired')}
-        </Text>
-        <Select
-          label={t('catalog.grade')}
-          clearable
-          value={grade}
-          onChange={setGrade}
-          data={QUALITY_GRADES.map((g) => ({ value: g, label: t(`catalog.gradeLabel.${g}`) }))}
-          placeholder={t('catalog.gradeLabel.none')}
-        />
-        <Group grow>
+        <Stack>
           <TextInput
-            label={t('catalog.number')}
+            label={t('catalog.sku')}
+            required
             dir="ltr"
-            value={number}
+            value={sku}
+            error={required.errors.sku}
             onChange={(e) => {
-              setNumber(e.currentTarget.value);
+              setSku(e.currentTarget.value);
             }}
           />
-          <Select
-            label={t('catalog.kind')}
-            value={kind}
-            onChange={setKind}
-            required={number.trim() !== ''}
-            data={PART_NUMBER_KINDS.map((k) => ({ value: k, label: t(`catalog.numberKind.${k}`) }))}
+          <TextInput
+            label={t('catalog.nameAr')}
+            value={nameAr}
+            error={required.errors.name}
+            onChange={(e) => {
+              setNameAr(e.currentTarget.value);
+            }}
           />
-        </Group>
-        <ErrorAlert error={create.error} />
-        <Button type="submit" loading={create.isPending}>
-          {t('common.save')}
-        </Button>
-      </Stack>
+          <TextInput
+            label={t('catalog.nameEn')}
+            dir="ltr"
+            value={nameEn}
+            onChange={(e) => {
+              setNameEn(e.currentTarget.value);
+            }}
+          />
+          <Text size="xs" c="dimmed">
+            {t('catalog.nameRequired')}
+          </Text>
+          <Select
+            label={t('catalog.grade')}
+            clearable
+            value={grade}
+            onChange={setGrade}
+            data={QUALITY_GRADES.map((g) => ({ value: g, label: t(`catalog.gradeLabel.${g}`) }))}
+            placeholder={t('catalog.gradeLabel.none')}
+          />
+          <Group grow>
+            <TextInput
+              label={t('catalog.number')}
+              dir="ltr"
+              value={number}
+              onChange={(e) => {
+                setNumber(e.currentTarget.value);
+              }}
+            />
+            <Select
+              label={t('catalog.kind')}
+              value={kind}
+              onChange={setKind}
+              required={number.trim() !== ''}
+              error={required.errors.kind}
+              data={PART_NUMBER_KINDS.map((k) => ({
+                value: k,
+                label: t(`catalog.numberKind.${k}`),
+              }))}
+            />
+          </Group>
+          <ErrorAlert error={create.error} />
+          <Button type="submit" loading={create.isPending}>
+            {t('common.save')}
+          </Button>
+        </Stack>
+      </Form>
     </Modal>
   );
 }
@@ -131,6 +145,8 @@ export function PartsPage() {
   const [search, setSearch] = useState('');
   const [q] = useDebouncedValue(search.trim(), 300);
   const [review, setReview] = useState<Review>('all');
+  // Archived parts are hidden everywhere else; this is the way back to them (to restore).
+  const [archived, setArchived] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkGrade, setBulkGrade] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -140,11 +156,12 @@ export function PartsPage() {
     const params = new URLSearchParams({ limit: String(PAGE) });
     if (q !== '') params.set('q', q);
     if (review !== 'all') params.set('needsReview', review);
+    if (archived) params.set('includeArchived', 'true');
     if (after !== undefined) params.set('after', after);
     return `/catalog/parts?${params.toString()}`;
   };
   const parts = useInfiniteQuery({
-    queryKey: [...catalogKeys.parts, q, review],
+    queryKey: [...catalogKeys.parts, q, review, archived],
     queryFn: ({ pageParam }) => api<PartSummary[]>('GET', query(pageParam)),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => (last.length < PAGE ? undefined : last.at(-1)?.sku),
@@ -204,6 +221,14 @@ export function PartsPage() {
             value: v,
             label: t(`catalog.needsReview.${v}`),
           }))}
+        />
+        <Switch
+          label={t('catalog.showArchived')}
+          checked={archived}
+          onChange={(e) => {
+            setArchived(e.currentTarget.checked);
+            setSelected(new Set());
+          }}
         />
       </Group>
       {manage && selected.size > 0 && (
