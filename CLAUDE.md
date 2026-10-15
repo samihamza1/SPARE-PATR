@@ -1,6 +1,7 @@
 # AutoParts POS & Accounting
 
 ## What this is
+
 Multi-tenant SaaS for car spare-parts shops (retail + wholesale to workshops).
 Standalone system (NOT Odoo-based). Pilot customer: Sky Motors.
 Arabic-first (RTL) with English fallback. Selling must continue offline.
@@ -9,9 +10,12 @@ everything money/tax/locale related is per-tenant configuration.
 Never hardcode a currency, tax rate or country rule. If a task needs one, ask.
 
 ## Status
-Pre-code. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
+
+Sprint 1 (platform foundation) done; Sprint 2 (auth, roles, settings, devices) in
+progress. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
 
 ## Stack (confirm each via a short ADR in Sprint 1 before locking)
+
 - TypeScript everywhere; pnpm workspaces monorepo, strict mode.
 - apps/api: Node.js REST API. apps/pos: React PWA (offline-first). apps/backoffice: React.
 - packages/shared: types, zod schemas, money utils, i18n.
@@ -21,6 +25,7 @@ Pre-code. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
 - Local dev: docker-compose (postgres).
 
 ## Non-negotiable invariants
+
 1. Money: NUMERIC in DB, decimal strings in JSON, a decimal library in code.
    Never JS floats for money or FX rates.
 2. Every monetary amount stores: amount, currency, fx rate used,
@@ -40,6 +45,7 @@ Pre-code. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
 8. All UI strings go through i18n; RTL is tested; no hardcoded text in components.
 
 ## Domain rules
+
 - Parts: internal SKU + many OEM/aftermarket numbers, quality grade
   (OEM / premium / good / economy), supplier part numbers, fitment to vehicles
   (shared vehicle hierarchy), interchange and supersession.
@@ -56,10 +62,12 @@ Pre-code. Scope, data model and scenarios: docs/BRIEF.md. Decisions: docs/adr/.
 - Costing: AVCO in the functional currency; landed costs allocated on receipt.
 
 ## Out of scope for v1
+
 Manufacturing, full HR/payroll (payroll-lite comes later), e-commerce storefront,
 marketing CRM, VIN decoding, e-invoicing connectors.
 
 ## How to work here
+
 - Start every sprint in plan mode: propose, wait for approval, then implement.
 - Tests first for: ledger posting rules, FX/rounding, stock costing,
   RLS isolation, sync idempotency.
@@ -69,5 +77,14 @@ marketing CRM, VIN decoding, e-invoicing connectors.
 - Do not weaken an invariant above without explicit approval.
 - Talk to me in Arabic. Code, comments, commits and docs in English.
 
-## Commands (fill in after scaffold)
-pnpm dev | pnpm test | pnpm lint | pnpm typecheck | pnpm db:migrate
+## Commands
+
+- Setup: `pnpm install`, `cp .env.example .env`, `pnpm db:up`, `pnpm db:migrate`
+- `pnpm dev` | `pnpm build`
+- `pnpm lint` | `pnpm format:check` | `pnpm typecheck`
+- `pnpm test` = `pnpm test:unit` + `pnpm test:db` (needs PostgreSQL; recreates autoparts_test)
+- `pnpm test:e2e`: Playwright journey against real API + DB + back office (set
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a pre-installed Chromium)
+- `pnpm db:migrate` | `pnpm db:new <name>` | `pnpm db:codegen` (run after every migration, commit the output)
+- `pnpm tenant:create --slug … --currency … --rounding … --negative-stock allow|deny …`
+  provisions a tenant (owner role; every value required, see apps/api/src/cli/tenant-create.ts)

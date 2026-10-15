@@ -1,0 +1,267 @@
+import type { DB } from '@autoparts/db';
+import { withTenant } from '@autoparts/db';
+import { changeOwnPasswordSchema, loginRequestSchema } from '@autoparts/shared';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { Kysely } from 'kysely';
+import { sql } from 'kysely';
+import { audit } from '../audit';
+import type { PlatformDeps } from '../auth/plugin';
+import { authOf } from '../auth/plugin';
+import {
+  SESSION_COOKIE,
+  createSession,
+  loadPermissions,
+  revokeSessions,
+  securityLimits,
+  sessionLimits,
+} from '../auth/sessions';
+import { ApiError } from '../errors';
+import { safeEqual, sha256 } from '../security/crypto';
+import { hashPassword, verifyPassword } from '../security/password';
+import { actorOf, inTenant, loadMe } from './common';
+
+const invalidCredentials = () => new ApiError(401, 'auth.invalid_credentials');
+
+/** Per (IP, shop, username): slows guessing without letting one IP lock out a whole shop. */
+const LOGIN_RATE_LIMIT = { max: 10, timeWindow: '1 minute' } as const;
+
+export async function resolveTenant(db: Kysely<DB>, slug: string): Promise<string | null> {
+  const { rows } = await sql<{
+    id: string | null;
+  }>`SELECT resolve_tenant_slug(${slug}) AS id`.execute(db);
+  return rows[0]?.id ?? null;
+}
+
+/** Optional X-Device-Credential header binds the session to an enrolled, active device. */
+async function deviceFromCredential(
+  db: Kysely<DB>,
+  tenantId: string,
+  credential: string | undefined,
+  now: Date,
+): Promise<string | null> {
+  if (credential === undefined || credential.length > 128) return null;
+  const hash = sha256(credential);
+  return withTenant(db, tenantId, async (trx) => {
+    const device = await trx
+      .selectFrom('devices')
+      .select(['id', 'credential_hash'])
+      .where('credential_hash', '=', hash)
+      .where('revoked_at', 'is', null)
+      .executeTakeFirst();
+    if (device?.credential_hash == null || !safeEqual(device.credential_hash, hash)) return null;
+    await trx
+      .updateTable('devices')
+      .set({ last_seen_at: now })
+      .where('id', '=', device.id)
+      .execute();
+    return device.id;
+  });
+}
+
+export function setSessionCookie(
+  reply: FastifyReply,
+  deps: PlatformDeps,
+  token: string,
+  expires: Date,
+): void {
+  void reply.setCookie(SESSION_COOKIE, token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: deps.cookieSecure,
+    expires,
+  });
+}
+
+export function authRoutes(app: FastifyInstance, deps: PlatformDeps): void {
+  const r = app.withTypeProvider<ZodTypeProvider>();
+
+  r.post(
+    '/auth/login',
+    {
+      schema: { body: loginRequestSchema },
+      config: {
+        access: 'public',
+        rateLimit: {
+          ...LOGIN_RATE_LIMIT,
+          hook: 'preHandler',
+          keyGenerator: (req) => {
+            const body = req.body as { tenant?: unknown; username?: unknown } | undefined;
+            return `login|${req.ip}|${String(body?.tenant)}|${String(body?.username).toLowerCase()}`;
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { tenant, username, password } = request.body;
+      const now = deps.now();
+      const tenantId = await resolveTenant(deps.db, tenant);
+      if (tenantId === null) {
+        await verifyPassword(null, password);
+        throw invalidCredentials();
+      }
+
+      const found = await withTenant(deps.db, tenantId, async (trx) => ({
+        user: await trx
+          .selectFrom('users')
+          .select(['id', 'password_hash', 'locked_until'])
+          .where(sql<string>`lower(username)`, '=', username.toLowerCase())
+          .where('archived_at', 'is', null)
+          .executeTakeFirst(),
+        settings: (await trx.selectFrom('tenants').select('settings').executeTakeFirstOrThrow())
+          .settings,
+      }));
+      const { user, settings } = found;
+      const failed = (reason: string, userId: string | null) =>
+        withTenant(deps.db, tenantId, (trx) =>
+          audit(
+            trx,
+            { tenantId, userId: null, requestId: request.id },
+            {
+              action: 'auth.login_failed',
+              entityType: 'user',
+              entityId: userId,
+              after: { username, reason, ip: request.ip },
+            },
+            now,
+          ),
+        );
+
+      // Argon2 runs outside any transaction so no pooled connection waits on it.
+      const passwordOk = await verifyPassword(user?.password_hash ?? null, password);
+
+      if (user === undefined) {
+        await failed('unknown_user', null);
+        throw invalidCredentials();
+      }
+      if (user.locked_until !== null && user.locked_until > now) {
+        await failed('locked', user.id);
+        // Only someone who knows the password learns the account is locked.
+        throw passwordOk ? new ApiError(423, 'auth.locked') : invalidCredentials();
+      }
+      if (!passwordOk) {
+        const { maxFailedLogins, lockoutMinutes } = securityLimits(settings);
+        const lockUntil = new Date(now.getTime() + lockoutMinutes * 60_000);
+        await withTenant(deps.db, tenantId, async (trx) => {
+          const updated = await trx
+            .updateTable('users')
+            .set({
+              failed_login_count: sql`CASE WHEN failed_login_count + 1 >= ${maxFailedLogins} THEN 0 ELSE failed_login_count + 1 END`,
+              locked_until: sql`CASE WHEN failed_login_count + 1 >= ${maxFailedLogins} THEN ${lockUntil}::timestamptz ELSE locked_until END`,
+            })
+            .where('id', '=', user.id)
+            .returning('locked_until')
+            .executeTakeFirstOrThrow();
+          const locked = updated.locked_until !== null && updated.locked_until > now;
+          await audit(
+            trx,
+            { tenantId, userId: null, requestId: request.id },
+            {
+              action: locked ? 'auth.lockout' : 'auth.login_failed',
+              entityType: 'user',
+              entityId: user.id,
+              after: { username, reason: 'bad_password', ip: request.ip },
+            },
+            now,
+          );
+        });
+        throw invalidCredentials();
+      }
+
+      const deviceId = await deviceFromCredential(
+        deps.db,
+        tenantId,
+        request.headers['x-device-credential'] as string | undefined,
+        now,
+      );
+      const { absoluteHours } = sessionLimits(settings);
+      const result = await withTenant(deps.db, tenantId, async (trx) => {
+        await trx
+          .updateTable('users')
+          .set({ failed_login_count: 0, locked_until: null, last_login_at: now })
+          .where('id', '=', user.id)
+          .execute();
+        const session = await createSession(trx, {
+          tenantId,
+          userId: user.id,
+          deviceId,
+          absoluteHours,
+          now,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'] ?? null,
+        });
+        await audit(
+          trx,
+          { tenantId, userId: user.id, deviceId, requestId: request.id },
+          { action: 'auth.login', entityType: 'session', entityId: session.sessionId },
+          now,
+        );
+        const permissions = await loadPermissions(trx, user.id);
+        return { session, me: await loadMe(trx, { userId: user.id, permissions }) };
+      });
+
+      setSessionCookie(reply, deps, result.session.token, result.session.expiresAt);
+      return result.me;
+    },
+  );
+
+  r.post('/auth/logout', { config: { access: 'authenticated' } }, async (request, reply) => {
+    const now = deps.now();
+    await inTenant(deps, request, async (trx, auth) => {
+      await revokeSessions(trx, { sessionId: auth.sessionId }, 'logout', now);
+      await audit(
+        trx,
+        actorOf(request),
+        { action: 'auth.logout', entityType: 'session', entityId: auth.sessionId },
+        now,
+      );
+    });
+    void reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return reply.code(204).send();
+  });
+
+  r.get('/auth/me', { config: { access: 'authenticated' } }, (request) =>
+    inTenant(deps, request, (trx, auth) => loadMe(trx, auth)),
+  );
+
+  r.post(
+    '/me/password',
+    { schema: { body: changeOwnPasswordSchema }, config: { access: 'authenticated' } },
+    async (request, reply) => {
+      const auth = authOf(request);
+      const now = deps.now();
+      const current = await inTenant(deps, request, (trx) =>
+        trx
+          .selectFrom('users')
+          .select('password_hash')
+          .where('id', '=', auth.userId)
+          .executeTakeFirstOrThrow(),
+      );
+      if (!(await verifyPassword(current.password_hash, request.body.currentPassword))) {
+        throw new ApiError(400, 'auth.wrong_password');
+      }
+      const hash = await hashPassword(request.body.newPassword);
+      await inTenant(deps, request, async (trx) => {
+        await trx
+          .updateTable('users')
+          .set({ password_hash: hash, password_changed_at: now })
+          .where('id', '=', auth.userId)
+          .execute();
+        await revokeSessions(
+          trx,
+          { userId: auth.userId, exceptSessionId: auth.sessionId },
+          'password_changed',
+          now,
+        );
+        await audit(
+          trx,
+          actorOf(request),
+          { action: 'user.password_change', entityType: 'user', entityId: auth.userId },
+          now,
+        );
+      });
+      return reply.code(204).send();
+    },
+  );
+}

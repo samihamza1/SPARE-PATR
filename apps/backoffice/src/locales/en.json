@@ -1,0 +1,224 @@
+{
+  "app": { "title": "Back office" },
+  "language": { "switch": "العربية", "ar": "Arabic", "en": "English" },
+  "nav": {
+    "menu": "Menu",
+    "home": "Home",
+    "users": "Users",
+    "roles": "Roles and permissions",
+    "settings": "Settings",
+    "devices": "Devices",
+    "audit": "Audit log"
+  },
+  "auth": {
+    "title": "Sign in",
+    "shopCode": "Shop code",
+    "shopCodeHint": "Remembered on this device after the first sign-in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "logout": "Sign out"
+  },
+  "home": {
+    "welcome": "Welcome, {{name}}",
+    "shop": "Shop",
+    "functionalCurrency": "Functional currency",
+    "permissions": "Your permissions"
+  },
+  "common": {
+    "save": "Save",
+    "saved": "Saved",
+    "actions": "Actions",
+    "never": "Never",
+    "none": "None",
+    "notFound": "Page not found",
+    "forbiddenHint": "Ask the shop administrator for the permission you need.",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "fields": {
+    "username": "Username",
+    "displayName": "Display name",
+    "password": "Password",
+    "newPassword": "New password",
+    "code": "Code",
+    "name": "Name",
+    "email": "E-mail",
+    "locale": "Language",
+    "minorUnits": "Decimal places",
+    "cashIncrement": "Smallest cash denomination",
+    "settings": "Settings"
+  },
+  "validation": {
+    "invalid": "Invalid value",
+    "password": {
+      "too_short": "Too short: at least 10 characters",
+      "too_long": "Too long",
+      "too_common": "Too common, choose another one"
+    }
+  },
+  "errors": {
+    "network": "Cannot reach the server",
+    "auth": {
+      "invalid_credentials": "Shop code, username or password is incorrect",
+      "locked": "This account is temporarily locked after failed attempts; try again later",
+      "unauthenticated": "Your session has ended; please sign in again",
+      "forbidden": "You do not have permission for this",
+      "bad_origin": "Request refused for security reasons",
+      "wrong_password": "The current password is incorrect"
+    },
+    "request": {
+      "invalid": "Some values are not valid",
+      "rate_limited": "Too many attempts; wait a minute and try again"
+    },
+    "resource": {
+      "not_found": "Not found",
+      "conflict": "Conflict: it already exists or this action is not possible"
+    },
+    "users": {
+      "last_admin": "Not possible: at least one administrator must keep managing users and roles"
+    },
+    "device": { "invalid_code": "The enrollment code is wrong or has expired" },
+    "server": { "error": "Something went wrong" }
+  },
+  "permissions": {
+    "users": { "manage": "Manage users" },
+    "roles": { "manage": "Manage roles" },
+    "settings": { "manage": "Manage settings" },
+    "devices": { "manage": "Manage devices" },
+    "sessions": { "manage": "Manage sessions" },
+    "audit": { "read": "View audit log" },
+    "cost": { "view": "See cost and margin" }
+  },
+  "roles": {
+    "title": "Roles and permissions",
+    "create": "New role",
+    "codeHint": "Lower-case letters and digits, e.g. senior_cashier",
+    "permission": "Permission",
+    "systemBadge": "System",
+    "system": {
+      "owner": "Owner",
+      "supervisor": "Supervisor",
+      "accountant": "Accountant",
+      "cashier": "Cashier"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "create": "New user",
+    "passwordHint": "At least 10 characters; a whole sentence works well",
+    "rolesOf": "Roles of {{name}}",
+    "resetPasswordOf": "Set a password for {{name}}",
+    "resetPasswordEffect": "The user is signed out everywhere and the account is unlocked.",
+    "resetPassword": "Password",
+    "roles": "Roles",
+    "lastLogin": "Last sign-in",
+    "archived": "Archived",
+    "archive": "Archive",
+    "archiveConfirm": "Archive {{name}}? They will not be able to sign in and their sessions end."
+  },
+  "settings": {
+    "title": "Shop settings",
+    "shopName": "Shop name",
+    "defaultLanguage": "Default language",
+    "timezone": "Time zone",
+    "functionalCurrency": "Functional currency",
+    "fixedHint": "Set when the shop was created",
+    "business": "Business rules",
+    "roundingMode": "Rounding",
+    "choose": "Choose",
+    "allowNegativeStock": "Allow selling with negative stock (flagged for review)",
+    "security": "Security and sessions",
+    "idleMinutes": "Idle timeout (minutes)",
+    "absoluteHours": "Maximum session length (hours)",
+    "maxFailedLogins": "Failed sign-ins before lock",
+    "lockoutMinutes": "Lock duration (minutes)"
+  },
+  "rounding": {
+    "HALF_UP": "Nearest, halves up",
+    "HALF_DOWN": "Nearest, halves down",
+    "HALF_EVEN": "Nearest, halves to even (banker's)",
+    "UP": "Always away from zero",
+    "DOWN": "Always towards zero (truncate)",
+    "CEIL": "Always up",
+    "FLOOR": "Always down"
+  },
+  "currencies": {
+    "title": "Currencies",
+    "add": "Add currency",
+    "code": "Currency code",
+    "codeHint": "3-letter ISO 4217 code",
+    "minorUnits": "Decimal places",
+    "minorUnitsHint": "Cannot be changed later",
+    "cashIncrement": "Smallest cash denomination",
+    "cashIncrementHint": "Optional, for cash rounding",
+    "active": "Active",
+    "functional": "Functional"
+  },
+  "devices": {
+    "title": "Devices",
+    "name": "Device name",
+    "add": "Add device",
+    "status": "Status",
+    "lastSeen": "Last seen",
+    "revoked": "Revoked",
+    "enrolled": "Enrolled",
+    "pending": "Waiting for enrollment",
+    "newCode": "New code",
+    "revoke": "Revoke",
+    "revokeConfirm": "Revoke {{name}}? All sessions on it end.",
+    "codeTitle": "Enroll {{name}}",
+    "codeInstructions": "On the device, open the POS, choose \"Enroll this device\", and enter the shop code and the enrollment code below. The code works once.",
+    "codeExpires": "The code expires at {{time}}"
+  },
+  "audit": {
+    "title": "Audit log",
+    "entityType": "Type",
+    "allEntities": "All types",
+    "when": "When",
+    "who": "Who",
+    "action": "Action",
+    "details": "Details",
+    "system": "System",
+    "loadMore": "Load more",
+    "entities": {
+      "user": "Users",
+      "role": "Roles",
+      "session": "Sessions",
+      "tenant": "Shop",
+      "currency": "Currencies",
+      "device": "Devices"
+    },
+    "actions": {
+      "auth": {
+        "login": "Signed in",
+        "login_failed": "Failed sign-in",
+        "lockout": "Account locked",
+        "logout": "Signed out"
+      },
+      "user": {
+        "create": "User created",
+        "update": "User updated",
+        "archive": "User archived",
+        "password_reset": "Password set by admin",
+        "password_change": "Password changed"
+      },
+      "role": {
+        "create": "Role created",
+        "update": "Role updated",
+        "grant": "Role granted",
+        "revoke": "Role revoked"
+      },
+      "settings": { "change": "Settings changed" },
+      "currency": { "create": "Currency added", "update": "Currency updated" },
+      "device": {
+        "create": "Device added",
+        "new_code": "New enrollment code",
+        "enroll": "Device enrolled",
+        "revoke": "Device revoked"
+      },
+      "session": { "revoke": "Session ended" },
+      "tenant": { "provision": "Shop created" }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@autoparts/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts"
+  },
+  "scripts": {
+    "migrate": "node scripts/with-env.js dbmate --migrations-dir migrations --no-dump-schema --wait up",
+    "rollback": "node scripts/with-env.js dbmate --migrations-dir migrations --no-dump-schema rollback",
+    "status": "node scripts/with-env.js dbmate --migrations-dir migrations status",
+    "new": "dbmate --migrations-dir migrations new",
+    "codegen": "node scripts/with-env.js kysely-codegen --dialect postgres --exclude-pattern public.schema_migrations --out-file src/types.generated.ts",
+    "codegen:check": "node scripts/with-env.js kysely-codegen --dialect postgres --exclude-pattern public.schema_migrations --out-file src/types.generated.ts --verify",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@autoparts/shared": "workspace:*",
+    "kysely": "^0.29.6",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "dbmate": "^2.36.0",
+    "kysely-codegen": "^0.20.0",
+    "vitest": "^5.0.3"
+  }
+}
