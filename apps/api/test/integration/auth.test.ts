@@ -1,6 +1,7 @@
 import { withTenant } from '@autoparts/db';
 import type { MeResponse } from '@autoparts/shared';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { buildServer } from '../../src/server';
 import type { Shop } from './harness';
 import {
   Client,
@@ -187,5 +188,38 @@ describe('rate limiting', () => {
     }
     expect(statuses.slice(0, 10).every((s) => s === 401)).toBe(true);
     expect(statuses[10]).toBe(429);
+  });
+});
+
+describe('per-IP credential throttle', () => {
+  it('limits attempts from one address across different accounts', async () => {
+    const app = buildServer({
+      checkDatabase: () => Promise.resolve(),
+      platform: {
+        db: env.appDb,
+        allowedOrigins: [],
+        cookieSecure: true,
+        now: () => env.clock.now,
+        ipAttemptsPerMinute: 5,
+      },
+    });
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: { tenant: shop.slug, username: `spray${String(i)}`, password: 'whatever pass' },
+      });
+      statuses.push(res.statusCode);
+    }
+    expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
+    // Enrollment shares the same per-IP bucket.
+    const enroll = await app.inject({
+      method: 'POST',
+      url: '/devices/enroll',
+      payload: { tenant: shop.slug, code: 'ABCDE-12345' },
+    });
+    expect(enroll.statusCode).toBe(429);
+    await app.close();
   });
 });

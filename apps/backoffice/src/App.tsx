@@ -1,16 +1,59 @@
-import { Center, Text } from '@mantine/core';
+import { Center, Loader, Text } from '@mantine/core';
+import { Suspense, lazy } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Route, Routes } from 'react-router';
 import { RequireAuth } from './auth';
 import { RequirePermission } from './components/RequirePermission';
 import { Shell } from './components/Shell';
-import { AuditPage } from './pages/AuditPage';
-import { DevicesPage } from './pages/DevicesPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
-import { RolesPage } from './pages/RolesPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { UsersPage } from './pages/UsersPage';
+
+// Admin pages load on demand so sign-in and home stay small.
+const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })));
+const RolesPage = lazy(() => import('./pages/RolesPage').then((m) => ({ default: m.RolesPage })));
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+const DevicesPage = lazy(() =>
+  import('./pages/DevicesPage').then((m) => ({ default: m.DevicesPage })),
+);
+const AuditPage = lazy(() => import('./pages/AuditPage').then((m) => ({ default: m.AuditPage })));
+const SearchPage = lazy(() =>
+  import('./pages/catalog/SearchPage').then((m) => ({ default: m.SearchPage })),
+);
+const PartsPage = lazy(() =>
+  import('./pages/catalog/PartsPage').then((m) => ({ default: m.PartsPage })),
+);
+const PartPage = lazy(() =>
+  import('./pages/catalog/PartPage').then((m) => ({ default: m.PartPage })),
+);
+const VehiclesPage = lazy(() =>
+  import('./pages/catalog/VehiclesPage').then((m) => ({ default: m.VehiclesPage })),
+);
+const SetupPage = lazy(() =>
+  import('./pages/catalog/SetupPage').then((m) => ({ default: m.SetupPage })),
+);
+const ImportsPage = lazy(() =>
+  import('./pages/catalog/ImportsPage').then((m) => ({ default: m.ImportsPage })),
+);
+const ImportBatchPage = lazy(() =>
+  import('./pages/catalog/ImportBatchPage').then((m) => ({ default: m.ImportBatchPage })),
+);
+
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <Center p="xl">
+          <Loader />
+        </Center>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 function NotFound() {
   const { t } = useTranslation();
@@ -37,16 +80,27 @@ export function App() {
           path="users"
           element={
             <RequirePermission permission="users.manage">
-              <UsersPage />
+              <Page>
+                <UsersPage />
+              </Page>
             </RequirePermission>
           }
         />
-        <Route path="roles" element={<RolesPage />} />
+        <Route
+          path="roles"
+          element={
+            <Page>
+              <RolesPage />
+            </Page>
+          }
+        />
         <Route
           path="settings"
           element={
             <RequirePermission permission="settings.manage">
-              <SettingsPage />
+              <Page>
+                <SettingsPage />
+              </Page>
             </RequirePermission>
           }
         />
@@ -54,7 +108,9 @@ export function App() {
           path="devices"
           element={
             <RequirePermission permission="devices.manage">
-              <DevicesPage />
+              <Page>
+                <DevicesPage />
+              </Page>
             </RequirePermission>
           }
         />
@@ -62,7 +118,69 @@ export function App() {
           path="audit"
           element={
             <RequirePermission permission="audit.read">
-              <AuditPage />
+              <Page>
+                <AuditPage />
+              </Page>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="search"
+          element={
+            <Page>
+              <SearchPage />
+            </Page>
+          }
+        />
+        <Route
+          path="catalog/parts"
+          element={
+            <Page>
+              <PartsPage />
+            </Page>
+          }
+        />
+        <Route
+          path="catalog/parts/:id"
+          element={
+            <Page>
+              <PartPage />
+            </Page>
+          }
+        />
+        <Route
+          path="catalog/vehicles"
+          element={
+            <Page>
+              <VehiclesPage />
+            </Page>
+          }
+        />
+        <Route
+          path="catalog/setup"
+          element={
+            <Page>
+              <SetupPage />
+            </Page>
+          }
+        />
+        <Route
+          path="catalog/imports"
+          element={
+            <RequirePermission permission="catalog.import">
+              <Page>
+                <ImportsPage />
+              </Page>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="catalog/imports/:id"
+          element={
+            <RequirePermission permission="catalog.import">
+              <Page>
+                <ImportBatchPage />
+              </Page>
             </RequirePermission>
           }
         />

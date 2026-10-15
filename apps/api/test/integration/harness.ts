@@ -37,7 +37,15 @@ export function setupEnv(): TestEnv {
   const app = buildServer(
     {
       checkDatabase: () => Promise.resolve(),
-      platform: { db: appDb, allowedOrigins: [ORIGIN], cookieSecure: true, now: () => clock.now },
+      platform: {
+        db: appDb,
+        allowedOrigins: [ORIGIN],
+        cookieSecure: true,
+        now: () => clock.now,
+        // Tests sign in many times a minute from one address; the per-IP limit has its
+        // own test below with a small value.
+        ipAttemptsPerMinute: 10_000,
+      },
     },
     { logger: process.env.TEST_LOG === '1' ? { level: 'error' } : false },
   );

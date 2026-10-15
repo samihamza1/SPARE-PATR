@@ -65,7 +65,15 @@ test('owner sets up a cashier, who sees only what a cashier may see', async ({ p
   await expect(page.getByRole('heading', { name: 'أهلاً كاشير أول' })).toBeVisible();
 
   const nav = page.getByRole('navigation', { name: 'القائمة' });
-  await expect(nav.getByRole('link')).toHaveText(['الرئيسية', 'الأدوار والصلاحيات']);
+  // Catalog pages are readable by everyone; import and admin pages are not offered.
+  await expect(nav.getByRole('link')).toHaveText([
+    'الرئيسية',
+    'البحث عن قطعة',
+    'القطع',
+    'السيارات',
+    'إعداد الكتالوج',
+    'الأدوار والصلاحيات',
+  ]);
 
   // Opening an admin page directly is refused (and the API refuses the data).
   await page.goto('/users');

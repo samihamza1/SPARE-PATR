@@ -21,6 +21,7 @@
     "db:new": "pnpm --filter @autoparts/db new",
     "db:codegen": "pnpm --filter @autoparts/db codegen",
     "tenant:create": "pnpm --filter @autoparts/api tenant:create",
+    "catalog:seed-synthetic": "pnpm --filter @autoparts/api catalog:seed-synthetic",
     "test:e2e": "pnpm --filter @autoparts/e2e test:e2e"
   },
   "devDependencies": {

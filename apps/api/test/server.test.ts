@@ -40,7 +40,18 @@ describe('loadConfig', () => {
       port: 3000,
       allowedOrigins: [],
       cookieSecure: true,
+      trustProxy: false,
     });
+  });
+
+  it('parses TRUST_PROXY as a flag, a hop count or an address list', () => {
+    const base = { APP_DATABASE_URL: 'x' };
+    expect(loadConfig({ ...base, TRUST_PROXY: 'true' }).trustProxy).toBe(true);
+    expect(loadConfig({ ...base, TRUST_PROXY: '2' }).trustProxy).toBe(2);
+    expect(loadConfig({ ...base, TRUST_PROXY: '10.0.0.0/8,127.0.0.1' }).trustProxy).toBe(
+      '10.0.0.0/8,127.0.0.1',
+    );
+    expect(loadConfig({ ...base, TRUST_PROXY: 'false' }).trustProxy).toBe(false);
   });
 
   it('parses allowed origins and the cookie flag', () => {
