@@ -1,5 +1,15 @@
 import type { Permission } from '@autoparts/shared';
-import { AppShell, Burger, Button, Group, NavLink, Stack, Text, Title } from '@mantine/core';
+import {
+  AppShell,
+  Burger,
+  Button,
+  Group,
+  NavLink,
+  ScrollArea,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
@@ -11,7 +21,8 @@ import { errorText } from './ErrorAlert';
 interface NavItem {
   to: string;
   label: string;
-  permission?: Permission;
+  /** Every permission the page needs. */
+  permissions?: Permission[];
 }
 
 const NAV: NavItem[] = [
@@ -20,12 +31,24 @@ const NAV: NavItem[] = [
   { to: '/catalog/parts', label: 'nav.parts' },
   { to: '/catalog/vehicles', label: 'nav.vehicles' },
   { to: '/catalog/setup', label: 'nav.catalogSetup' },
-  { to: '/catalog/imports', label: 'nav.imports', permission: 'catalog.import' },
-  { to: '/users', label: 'nav.users', permission: 'users.manage' },
+  { to: '/catalog/imports', label: 'nav.imports', permissions: ['catalog.import'] },
+  { to: '/inventory/stock', label: 'nav.stock' },
+  { to: '/inventory/adjust', label: 'nav.adjust', permissions: ['stock.adjust'] },
+  { to: '/inventory/transfer', label: 'nav.transfer', permissions: ['stock.transfer'] },
+  { to: '/inventory/counts', label: 'nav.counts', permissions: ['stock.count'] },
+  {
+    to: '/inventory/opening',
+    label: 'nav.opening',
+    permissions: ['stock.opening', 'cost.view'],
+  },
+  { to: '/inventory/review', label: 'nav.review', permissions: ['stock.review'] },
+  { to: '/locations', label: 'nav.locations' },
+  { to: '/fx-rates', label: 'nav.fxRates' },
+  { to: '/users', label: 'nav.users', permissions: ['users.manage'] },
   { to: '/roles', label: 'nav.roles' },
-  { to: '/settings', label: 'nav.settings', permission: 'settings.manage' },
-  { to: '/devices', label: 'nav.devices', permission: 'devices.manage' },
-  { to: '/audit', label: 'nav.audit', permission: 'audit.read' },
+  { to: '/settings', label: 'nav.settings', permissions: ['settings.manage'] },
+  { to: '/devices', label: 'nav.devices', permissions: ['devices.manage'] },
+  { to: '/audit', label: 'nav.audit', permissions: ['audit.read'] },
 ];
 
 export function LanguageSwitch() {
@@ -105,9 +128,10 @@ export function Shell() {
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="xs" aria-label={t('nav.menu')}>
-        <Stack gap={2}>
-          {NAV.filter((item) => item.permission === undefined || can(item.permission)).map(
-            (item) => (
+        {/* The menu outgrows short screens; it scrolls on its own, below the header. */}
+        <AppShell.Section grow component={ScrollArea}>
+          <Stack gap={2}>
+            {NAV.filter((item) => (item.permissions ?? []).every((p) => can(p))).map((item) => (
               <NavLink
                 key={item.to}
                 component={RouterLink}
@@ -116,9 +140,9 @@ export function Shell() {
                 label={t(item.label)}
                 onClick={close}
               />
-            ),
-          )}
-        </Stack>
+            ))}
+          </Stack>
+        </AppShell.Section>
       </AppShell.Navbar>
       <AppShell.Main>
         <Outlet />

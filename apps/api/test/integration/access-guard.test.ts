@@ -75,8 +75,11 @@ describe('route access guard', () => {
     }
   });
 
-  it('rejects a cashier (no platform permissions) on every permission-gated route', async () => {
-    const gated = routes.filter((r) => r.access !== 'public' && r.access !== 'authenticated');
+  it('rejects a cashier on every route gated by a permission cashiers lack', async () => {
+    // Cashiers only hold stock.count (product owner, 2026-10-06).
+    const gated = routes.filter(
+      (r) => r.access !== 'public' && r.access !== 'authenticated' && r.access !== 'stock.count',
+    );
     expect(gated.length).toBeGreaterThan(10);
     for (const route of gated) {
       for (const method of route.methods) {

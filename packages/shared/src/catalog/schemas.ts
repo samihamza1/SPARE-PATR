@@ -311,14 +311,25 @@ export const searchQuerySchema = z.object({
 });
 
 export const ALTERNATIVE_RELATIONS = ['interchange', 'shared_number', 'replacement'] as const;
+/**
+ * Quantities on hand, without cost (ADR 0023): the total and each location holding stock
+ * (non-zero; negative after accepted offline sales).
+ */
+export const searchStockSchema = z.object({
+  total: z.int(),
+  locations: z.array(z.object({ locationId: uuidSchema, quantity: z.int() })),
+});
 export const searchHitSchema = z.object({
   part: partSummarySchema,
   price: currentPriceSchema.nullable(),
+  stock: searchStockSchema,
 });
 export const searchResultSchema = z.object({
   interpretation: z.object({
     text: z.array(z.string()),
+    /** The year, or the first of a range ("2015-2023"); yearTo is the last. */
     year: z.int().nullable(),
+    yearTo: z.int().nullable(),
     partNumber: z.string().nullable(),
     vehicles: z.array(
       z.object({ id: uuidSchema, name: z.string(), level: z.enum(VEHICLE_LEVELS) }),

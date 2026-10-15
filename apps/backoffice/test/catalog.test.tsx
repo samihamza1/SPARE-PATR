@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ar from '../src/locales/ar.json';
-import { ALL, FakeApi, id, me, part, pick, renderApp } from './harness';
+import { ALL, FakeApi, LOCATIONS, id, me, part, pick, renderApp } from './harness';
 
 afterEach(() => {
   cleanup();
@@ -12,10 +12,12 @@ afterEach(() => {
 
 describe('salesperson search', () => {
   it('shows each result with its alternatives in the order the API ranked them', async () => {
+    const shop = LOCATIONS[0]?.id ?? '';
     const result: SearchResult = {
       interpretation: {
         text: ['فحمات'],
         year: 2015,
+        yearTo: 2023,
         partNumber: null,
         vehicles: [{ id: id(90), name: 'Land Cruiser', level: 'model' }],
       },
@@ -23,16 +25,19 @@ describe('salesperson search', () => {
         {
           part: part(1, 'BP-OEM', 'oem', 'فحمات أمامية'),
           price: { amount: '85.00', currency: 'AAA' },
+          stock: { total: 0, locations: [] },
           matchedBy: 'text',
           alternatives: [
             {
               part: part(2, 'BP-PRM', 'premium', 'فحمات ممتازة'),
               price: { amount: '60.00', currency: 'AAA' },
+              stock: { total: 4, locations: [{ locationId: shop, quantity: 4 }] },
               relation: 'interchange',
             },
             {
               part: part(3, 'BP-UNG', null, 'فحمات'),
               price: null,
+              stock: { total: 0, locations: [] },
               relation: 'shared_number',
             },
           ],
@@ -41,11 +46,12 @@ describe('salesperson search', () => {
     };
     const api = new FakeApi()
       .on('GET /auth/me', { status: 200, body: me([]) })
-      .on('GET /catalog/search', { status: 200, body: result });
+      .on('GET /catalog/search', { status: 200, body: result })
+      .on('GET /locations', { status: 200, body: LOCATIONS });
     api.install();
     await renderApp('/search');
     const box = await screen.findByRole('textbox', { name: ar.search.title });
-    fireEvent.change(box, { target: { value: 'فحمات امامية لاندكروزر 2015' } });
+    fireEvent.change(box, { target: { value: 'فحمات امامية لاندكروزر 2015-2023' } });
     fireEvent.click(screen.getByRole('button', { name: ar.search.submit }));
 
     const card = await screen.findByTestId('search-result');
@@ -60,10 +66,21 @@ describe('salesperson search', () => {
     expect(alternatives[0]?.textContent).toContain(ar.catalog.relation.interchange);
     expect(alternatives[1]?.textContent).toContain(ar.catalog.gradeLabel.none);
     expect(alternatives[1]?.textContent).toContain(ar.catalog.noPrice);
-    expect(screen.getByText(ar.search.year.replace('{{year}}', '2015'))).toBeTruthy();
-    expect(new URLSearchParams(api.calls.at(-1)?.query).get('q')).toBe(
-      'فحمات امامية لاندكروزر 2015',
-    );
+    // Quantities per location (a cashier sees them, without cost); none on hand is said so.
+    expect(card.textContent).toContain(ar.inventory.outOfStock);
+    await waitFor(() => {
+      expect(alternatives[0]?.textContent).toContain(
+        ar.inventory.atLocation
+          .replace('{{location}}', 'المحل')
+          .replace('{{quantity}}', new Intl.NumberFormat('ar').format(4)),
+      );
+    });
+    expect(alternatives[1]?.textContent).toContain(ar.inventory.outOfStock);
+    expect(
+      screen.getByText(ar.search.years.replace('{{from}}', '2015').replace('{{to}}', '2023')),
+    ).toBeTruthy();
+    const searched = api.calls.find((c) => c.path === '/catalog/search');
+    expect(new URLSearchParams(searched?.query).get('q')).toBe('فحمات امامية لاندكروزر 2015-2023');
   });
 });
 

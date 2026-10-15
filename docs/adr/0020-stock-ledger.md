@@ -68,3 +68,19 @@ and flagged for review (product owner, 2026-10-06).
 - A reconciliation test checks that the sums of the moves equal the derived tables.
 - Sales, receipts and returns (later sprints) post through the same engine.
 - Offline moves synced after an approved count are a rare case handled with POS sync.
+
+## Addendum (2026-10-13, Sprint 4 review)
+
+- **`search_path` names `pg_temp` last** on every `SECURITY DEFINER` function. Left out,
+  `pg_temp` is searched first for tables, so a caller with the TEMP privilege could shadow
+  `stock_costs` or `stock_balances` with temp tables and make the trigger write those
+  instead. The catalog guard now requires `pg_temp` at the end.
+- **Archived parts take no stock** (`ST005` → `catalog.archived`). `lock_stock_costs` locks
+  the parts `FOR SHARE` in id order before their cost rows, and the trigger locks the
+  part and the location the same way. Archiving takes a conflicting row lock, so an
+  archive and a move into the same part or location run one after the other: either the
+  archive sees the stock and is refused (`ST003`), or the move sees the archive and is
+  refused (`ST005`/`ST002`). A deadlock between such writers is reported like a stale
+  snapshot (`stock.concurrent_change`, retryable).
+- **A closed count or opening draft stays closed**: a trigger refuses any change once the
+  count is approved or cancelled, or the draft posted or discarded.

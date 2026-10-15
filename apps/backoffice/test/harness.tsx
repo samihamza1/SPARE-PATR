@@ -1,5 +1,7 @@
+import { PERMISSIONS } from '@autoparts/shared';
 import type {
   Currency,
+  Location,
   MeResponse,
   PartDetail,
   PartSummary,
@@ -17,7 +19,12 @@ import { setupI18n } from '../src/i18n';
 import ar from '../src/locales/ar.json';
 import { Providers, createQueryClient } from '../src/Providers';
 
-type Handler = (body: unknown, query: URLSearchParams) => { status: number; body?: unknown };
+interface FakeResponse {
+  status: number;
+  body?: unknown;
+}
+/** A response, or a promise of one to hold the request open (a slow network). */
+type Handler = (body: unknown, query: URLSearchParams) => FakeResponse | Promise<FakeResponse>;
 
 /** A tiny fake of the API: "METHOD /path" -> handler. Unmatched requests fail the test. */
 export class FakeApi {
@@ -25,7 +32,7 @@ export class FakeApi {
   private readonly routes = new Map<string, Handler>();
   private readonly unreachable = new Set<string>();
 
-  on(route: string, handler: Handler | { status: number; body?: unknown }): this {
+  on(route: string, handler: Handler | FakeResponse): this {
     this.unreachable.delete(route);
     this.routes.set(route, typeof handler === 'function' ? handler : () => handler);
     return this;
@@ -50,12 +57,12 @@ export class FakeApi {
       if (handler === undefined) {
         return Promise.reject(new Error(`Unexpected request ${method} ${path}`));
       }
-      const res = handler(body, new URLSearchParams(query));
-      return Promise.resolve(
-        new Response(res.status === 204 ? null : JSON.stringify(res.body ?? {}), {
-          status: res.status,
-          headers: { 'content-type': 'application/json' },
-        }),
+      return Promise.resolve(handler(body, new URLSearchParams(query))).then(
+        (res) =>
+          new Response(res.status === 204 ? null : JSON.stringify(res.body ?? {}), {
+            status: res.status,
+            headers: { 'content-type': 'application/json' },
+          }),
       );
     });
   }
@@ -84,18 +91,8 @@ export function me(
   };
 }
 
-export const ALL: Permission[] = [
-  'audit.read',
-  'catalog.import',
-  'catalog.manage',
-  'cost.view',
-  'devices.manage',
-  'prices.manage',
-  'roles.manage',
-  'sessions.manage',
-  'settings.manage',
-  'users.manage',
-];
+/** Every permission, as an owner holds them. */
+export const ALL: Permission[] = [...PERMISSIONS];
 
 export const ROLES: Role[] = [
   {
@@ -209,10 +206,25 @@ export const partDetail = (
   ...overrides,
 });
 
-/** The part and the lookups its page loads. */
+/** The default shop (ADR 0018): every tenant has one. */
+export const LOCATIONS: Location[] = [
+  {
+    id: '01900000-0000-7000-8000-0000000000f1',
+    name: 'المحل',
+    kind: 'shop',
+    isDefault: true,
+    sortOrder: 0,
+    archivedAt: null,
+  },
+];
+
+/** The part and the lookups its page loads (stock card included). */
 export function onPartPage(api: FakeApi, detail: PartDetail): FakeApi {
   return api
     .on(`GET /catalog/parts/${detail.id}`, ok(detail))
+    .on(`GET /stock/parts/${detail.id}`, ok({ partId: detail.id, total: 0, locations: [] }))
+    .on('GET /stock/moves', ok([]))
+    .on('GET /locations', ok(LOCATIONS))
     .on(`GET /catalog/parts/${detail.id}/prices`, ok([]))
     .on('GET /catalog/brands', ok([]))
     .on('GET /catalog/categories', ok([]))

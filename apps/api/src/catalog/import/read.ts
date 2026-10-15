@@ -26,6 +26,14 @@ export const READ_LIMITS: ReadLimits = { timeoutMs: 20_000, maxHeapMb: 256 };
 /** Files read at once; more wait their turn, so memory stays bounded under load. */
 const MAX_PARALLEL_READS = 2;
 /**
+ * Waiting files, each holding its upload in memory, and how long one may wait. Past
+ * either, and past MAX_PER_OWNER files of one tenant at once, a read is refused at once
+ * with import.busy (503) instead of queueing without end.
+ */
+const MAX_WAITING = 6;
+const MAX_WAIT_MS = 30_000;
+const MAX_PER_OWNER = 2;
+/**
  * The only environment the reader gets: it needs no configuration, and a process parsing
  * untrusted files should not hold the database credentials. NODE_OPTIONS is left out so its
  * heap flags cannot override the reader's own.
@@ -33,18 +41,49 @@ const MAX_PARALLEL_READS = 2;
 const READER_ENV = ['PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'SystemRoot'];
 
 let running = 0;
-const waiting: (() => void)[] = [];
+const waiting: { start: () => void }[] = [];
+const perOwner = new Map<string, number>();
 
-async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (running < MAX_PARALLEL_READS) running++;
-  else await new Promise<void>((resolve) => waiting.push(resolve));
+const busy = () => new ApiError(503, 'import.busy');
+
+function waitForSlot(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const entry = {
+      start: () => {
+        clearTimeout(timer);
+        resolve();
+      },
+    };
+    const timer = setTimeout(() => {
+      waiting.splice(waiting.indexOf(entry), 1);
+      reject(busy());
+    }, MAX_WAIT_MS);
+    waiting.push(entry);
+  });
+}
+
+async function withSlot<T>(owner: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const owned = owner === undefined ? 0 : (perOwner.get(owner) ?? 0);
+  if (owned >= MAX_PER_OWNER) throw busy();
+  if (running >= MAX_PARALLEL_READS && waiting.length >= MAX_WAITING) throw busy();
+  if (owner !== undefined) perOwner.set(owner, owned + 1);
   try {
-    return await fn();
+    if (running < MAX_PARALLEL_READS) running++;
+    else await waitForSlot();
+    try {
+      return await fn();
+    } finally {
+      // The slot passes straight to the next waiter, if any.
+      const next = waiting.shift();
+      if (next === undefined) running--;
+      else next.start();
+    }
   } finally {
-    // The slot passes straight to the next waiter, if any.
-    const next = waiting.shift();
-    if (next === undefined) running--;
-    else next();
+    if (owner !== undefined) {
+      const left = (perOwner.get(owner) ?? 1) - 1;
+      if (left === 0) perOwner.delete(owner);
+      else perOwner.set(owner, left);
+    }
   }
 }
 
@@ -102,21 +141,27 @@ function runReader(request: ReadRequest, limits: ReadLimits): Promise<ReadRespon
   });
 }
 
-async function read(request: ReadRequest, limits: ReadLimits): Promise<ReadResponse> {
-  const response = await withSlot(() => runReader(request, limits));
+async function read(
+  request: ReadRequest,
+  limits: ReadLimits,
+  owner: string | undefined,
+): Promise<ReadResponse> {
+  const response = await withSlot(owner, () => runReader(request, limits));
   if (!response.ok) throw new ApiError(400, response.code);
   return response;
 }
 
 /**
  * Reads an .xlsx (all sheets, or only `only`) or a UTF-8 .csv in a reader process; see
- * readWorkbookInThread for what is read. `limits` is for tests.
+ * readWorkbookInThread for what is read. `owner` (the tenant) limits one owner's reads at
+ * once; `limits` is for tests.
  */
 export async function readWorkbook(
   bytes: Uint8Array,
   fileName: string,
   only?: string,
   limits: ReadLimits = READ_LIMITS,
+  owner?: string,
 ): Promise<WorkbookSheet[]> {
   const request: ReadRequest = {
     kind: 'sheets',
@@ -124,7 +169,7 @@ export async function readWorkbook(
     fileName,
     ...(only !== undefined && { only }),
   };
-  const response = await read(request, limits);
+  const response = await read(request, limits, owner);
   return 'sheets' in response ? response.sheets : [];
 }
 
@@ -137,7 +182,8 @@ export async function inspectWorkbook(
   fileName: string,
   sampleRows: number,
   limits: ReadLimits = READ_LIMITS,
+  owner?: string,
 ): Promise<ImportSheetPreview[]> {
-  const response = await read({ kind: 'preview', bytes, fileName, sampleRows }, limits);
+  const response = await read({ kind: 'preview', bytes, fileName, sampleRows }, limits, owner);
   return 'previews' in response ? response.previews : [];
 }

@@ -38,6 +38,7 @@ import {
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { useFormatDateTime } from '../../format';
 import { Form, useRequired } from '../../forms';
+import { StockCard } from '../../inventory/StockCard';
 
 const blankToNull = (v: string) => (v.trim() === '' ? null : v.trim());
 
@@ -230,7 +231,10 @@ function PricesCard({ part }: { part: PartDetail }) {
               error={required.errors.listId}
               data={(lists.data ?? [])
                 .filter((l) => l.archivedAt === null)
-                .map((l) => ({ value: l.id, label: `${l.name} (${l.currency})` }))}
+                .map((l) => ({
+                  value: l.id,
+                  label: t('catalog.priceListOption', { name: l.name, currency: l.currency }),
+                }))}
             />
             <TextInput
               label={t('catalog.price')}
@@ -299,9 +303,17 @@ function PartLink({ part }: { part: PartSummary }) {
   );
 }
 
+/**
+ * One part. The view starts afresh for each part, so nothing typed for one part (a price,
+ * a number, a reason) stays on screen, or is saved, after following a link to another.
+ */
 export function PartPage() {
-  const { t } = useTranslation();
   const { id = '' } = useParams();
+  return <PartView key={id} id={id} />;
+}
+
+function PartView({ id }: { id: string }) {
+  const { t } = useTranslation();
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const key = catalogKeys.part(id);
@@ -352,6 +364,8 @@ export function PartPage() {
       </Group>
       <ErrorAlert error={act.error} />
 
+      <StockCard partId={p.id} replacementId={p.supersededBy?.id ?? null} />
+
       <Card withBorder>
         <Title order={4}>{t('catalog.details')}</Title>
         {manage ? (
@@ -364,9 +378,10 @@ export function PartPage() {
             }}
           />
         ) : (
-          <Text>
-            {p.nameAr} {p.nameEn}
-          </Text>
+          <Stack gap={0}>
+            {p.nameAr !== null && <Text>{p.nameAr}</Text>}
+            {p.nameEn !== null && <Text dir="ltr">{p.nameEn}</Text>}
+          </Stack>
         )}
       </Card>
 
@@ -399,7 +414,7 @@ export function PartPage() {
         {manage && (
           <Form
             onSubmit={() => {
-              if (!numberRequired.ok()) return;
+              if (act.isPending || !numberRequired.ok()) return;
               act.mutate({
                 path: '/numbers',
                 body: { id: newId(), number: number.trim(), kind },
@@ -428,7 +443,9 @@ export function PartPage() {
                   label: t(`catalog.numberKind.${k}`),
                 }))}
               />
-              <Button type="submit">{t('catalog.addNumber')}</Button>
+              <Button type="submit" loading={act.isPending}>
+                {t('catalog.addNumber')}
+              </Button>
             </Group>
           </Form>
         )}
@@ -507,7 +524,7 @@ export function PartPage() {
         <Title order={4}>{t('catalog.supersession')}</Title>
         {p.supersededBy !== null && (
           <Group>
-            <Text fw={600}>{t('catalog.supersededBy')}:</Text>
+            <Text fw={600}>{t('common.label', { label: t('catalog.supersededBy') })}</Text>
             <PartLink part={p.supersededBy} />
           </Group>
         )}
@@ -545,7 +562,7 @@ export function PartPage() {
         )}
         {p.supersedes.map((x) => (
           <Group key={x.id}>
-            <Text fw={600}>{t('catalog.supersedes')}:</Text>
+            <Text fw={600}>{t('common.label', { label: t('catalog.supersedes') })}</Text>
             <PartLink part={x} />
           </Group>
         ))}

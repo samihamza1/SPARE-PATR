@@ -66,7 +66,7 @@ export function Price({ price }: { price: { amount: string; currency: string } |
   if (price === null) return <Text c="dimmed">{t('catalog.noPrice')}</Text>;
   return (
     <Text span dir="ltr" ff="monospace">
-      {price.amount} {price.currency}
+      {t('inventory.amount', { amount: price.amount, currency: price.currency })}
     </Text>
   );
 }

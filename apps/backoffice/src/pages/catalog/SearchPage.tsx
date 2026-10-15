@@ -18,6 +18,7 @@ import { Link } from 'react-router';
 import { api } from '../../api';
 import { GradeBadge, Price, partName } from '../../catalog/common';
 import { ErrorAlert } from '../../components/ErrorAlert';
+import { StockBadges } from '../../inventory/common';
 
 /** The salesperson's search (BRIEF scenario 1): one box, results with ranked alternatives. */
 export function SearchPage() {
@@ -61,15 +62,23 @@ export function SearchPage() {
       {data !== undefined && (
         <Group gap="xs" aria-label={t('search.understood')}>
           <Text size="sm" c="dimmed">
-            {t('search.understood')}:
+            {t('common.label', { label: t('search.understood') })}
           </Text>
           {data.interpretation.vehicles.map((v) => (
             <Badge key={v.id} variant="light">
-              {t(`catalog.level.${v.level}`)}: {v.name}
+              {t('common.labelValue', { label: t(`catalog.level.${v.level}`), value: v.name })}
             </Badge>
           ))}
           {data.interpretation.year !== null && (
-            <Badge variant="light">{t('search.year', { year: data.interpretation.year })}</Badge>
+            <Badge variant="light">
+              {data.interpretation.yearTo !== null &&
+              data.interpretation.yearTo !== data.interpretation.year
+                ? t('search.years', {
+                    from: data.interpretation.year,
+                    to: data.interpretation.yearTo,
+                  })
+                : t('search.year', { year: data.interpretation.year })}
+            </Badge>
           )}
           {data.interpretation.partNumber !== null && (
             <Badge variant="light" dir="ltr">
@@ -95,7 +104,10 @@ export function SearchPage() {
               <GradeBadge grade={r.part.qualityGrade} />
               <Badge variant="dot">{t(`search.matchedBy.${r.matchedBy}`)}</Badge>
             </Group>
-            <Price price={r.price} />
+            <Group gap="xs">
+              <StockBadges locations={r.stock.locations} />
+              <Price price={r.price} />
+            </Group>
           </Group>
           <Text size="sm" fw={600} mt="sm">
             {t('search.alternatives')}
@@ -122,6 +134,9 @@ export function SearchPage() {
                       <Badge variant="light" color="gray">
                         {t(`catalog.relation.${a.relation}`)}
                       </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <StockBadges locations={a.stock.locations} />
                     </Table.Td>
                     <Table.Td>
                       <Price price={a.price} />

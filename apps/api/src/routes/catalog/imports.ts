@@ -22,7 +22,7 @@ import type { AuthContext } from '../../auth/context';
 import { authOf } from '../../auth/plugin';
 import type { PlatformDeps } from '../../auth/plugin';
 import { ApiError, forbidden } from '../../errors';
-import { inspectWorkbook, readWorkbook } from '../../catalog/import/read';
+import { READ_LIMITS, inspectWorkbook, readWorkbook } from '../../catalog/import/read';
 import {
   analyseBatch,
   applyBatch,
@@ -75,6 +75,8 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
         decode(request.body.contentBase64),
         request.body.fileName,
         SAMPLE_ROWS,
+        READ_LIMITS,
+        authOf(request).tenantId,
       ),
     }),
   );
@@ -91,7 +93,13 @@ export function importRoutes(app: FastifyInstance, deps: PlatformDeps): void {
       const b = request.body;
       assertMaySetPrices(authOf(request), b.mapping);
       const bytes = decode(b.contentBase64);
-      const [sheet] = await readWorkbook(bytes, b.fileName, b.sheet);
+      const [sheet] = await readWorkbook(
+        bytes,
+        b.fileName,
+        b.sheet,
+        READ_LIMITS,
+        authOf(request).tenantId,
+      );
       const detail = await inTenant(deps, request, async (trx, auth) => {
         await stageBatch(
           trx,

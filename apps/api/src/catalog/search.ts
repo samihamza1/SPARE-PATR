@@ -12,6 +12,8 @@ import {
   toPartSummary,
 } from './mappers';
 
+type SearchStock = SearchResult['results'][number]['stock'];
+
 export interface SearchInput {
   q: string;
   vehicleId?: string | undefined;
@@ -21,8 +23,10 @@ export interface SearchInput {
 
 const YEAR = /^(19|20)\d{2}$/;
 const MAX_NGRAM = 3;
-/** Adjacent number tokens joined into one candidate, at most ("04465 60320" is one number). */
-const MAX_JOIN = 4;
+/** Adjacent tokens joined into one candidate, at most ("A 271 180 00 09" is one number). */
+const MAX_JOIN = 6;
+/** A letter group printed apart from a number's digits: "W 712/75", "HU 7008 z". */
+const NUMBER_LETTERS = /^[a-z]{1,3}$/i;
 const MAX_CANDIDATES = 12;
 /**
  * Separators between search tokens, as normalize_search() treats them, except the
@@ -50,13 +54,15 @@ export interface Interpretation {
 }
 
 /**
- * Splits the query into words and part-number candidates (ADR 0015 addendum).
+ * Splits the query into words and part-number candidates (ADR 0015 addenda).
  *
  * A number is one whitespace-separated token with digits ("04465-60320"), or a run of
- * adjacent ones ("04465 60320"); every contiguous join of a run is a candidate, longest
- * first. Words without digits never join a number, so "pads 04465 60320" still finds
- * 0446560320. A year-like token (19xx/20xx) breaks a run and is matched only exactly,
- * unless it is the whole query (a numeric SKU such as "2015").
+ * adjacent ones ("04465 60320"), which may include letter groups of up to three letters
+ * printed apart from the digits ("W 712/75", "HU 7008 z", "A 271 180 00 09"). Every
+ * contiguous join of a run that holds a digit is a candidate, longest first. Longer words
+ * never join a number, so "pads 04465 60320" still finds 0446560320. A year-like token
+ * (19xx/20xx) breaks a run and is matched only exactly, unless it is the whole query (a
+ * numeric SKU such as "2015").
  */
 export function interpret(q: string): Interpretation {
   const words = normalizeSearchText(q)
@@ -65,25 +71,28 @@ export function interpret(q: string): Interpretation {
   const raw = q.split(NUMBER_TOKEN_SEPARATORS).filter((t) => t !== '');
   const tokens = raw.map((t) => ({
     norm: normalizePartNumber(t),
+    letters: NUMBER_LETTERS.test(t),
     words: normalizeSearchText(t)
       .split(' ')
       .filter((w) => w !== ''),
   }));
-  const isNumber = (t: { norm: string }) => /\d/.test(t.norm);
+  const hasDigit = (norm: string) => /\d/.test(norm);
   const isYear = (t: { norm: string }) => YEAR.test(t.norm) && tokens.length > 1;
-  const inRun = (k: number) => {
+  const joins = (k: number) => {
     const t = tokens[k];
-    return t !== undefined && isNumber(t) && !isYear(t);
+    return t !== undefined && (t.letters || (hasDigit(t.norm) && !isYear(t)));
   };
 
   const numbers: NumberCandidate[] = [];
   const add = (c: NumberCandidate) => {
-    if (c.value.length >= 4 && !numbers.some((n) => n.value === c.value)) numbers.push(c);
+    if (c.value.length >= 4 && hasDigit(c.value) && !numbers.some((n) => n.value === c.value)) {
+      numbers.push(c);
+    }
   };
   let run = 0;
   for (let i = 0; i < tokens.length;) {
     const first = tokens[i];
-    if (first === undefined || !isNumber(first) || isYear(first)) {
+    if (first === undefined || !joins(i)) {
       if (first !== undefined && isYear(first)) {
         add({ value: first.norm, exactOnly: true, run: -1, span: 1, words: first.words });
       }
@@ -91,20 +100,23 @@ export function interpret(q: string): Interpretation {
       continue;
     }
     let j = i + 1;
-    while (j < tokens.length && inRun(j)) j++;
-    for (let span = Math.min(MAX_JOIN, j - i); span >= 1; span--) {
-      for (let k = i; k + span <= j; k++) {
-        const part = tokens.slice(k, k + span);
-        add({
-          value: part.map((t) => t.norm).join(''),
-          exactOnly: false,
-          run,
-          span,
-          words: part.flatMap((t) => t.words),
-        });
+    while (j < tokens.length && joins(j)) j++;
+    // Letter groups alone are words, not a number.
+    if (tokens.slice(i, j).some((t) => hasDigit(t.norm))) {
+      for (let span = Math.min(MAX_JOIN, j - i); span >= 1; span--) {
+        for (let k = i; k + span <= j; k++) {
+          const part = tokens.slice(k, k + span);
+          add({
+            value: part.map((t) => t.norm).join(''),
+            exactOnly: false,
+            run,
+            span,
+            words: part.flatMap((t) => t.words),
+          });
+        }
       }
+      run++;
     }
-    run++;
     i = j;
   }
   return { words, numbers: numbers.slice(0, MAX_CANDIDATES) };
@@ -123,7 +135,8 @@ async function detectVehicles(trx: Trx, words: string[]) {
         );
     }
   }
-  if (grams.size === 0) return { vehicleIds: [] as string[], rest: words };
+  if (grams.size === 0)
+    return { vehicleIds: [] as string[], vehicleWords: [] as string[], rest: words };
   const keys = [...grams.keys()];
   const { rows } = await sql<{ key: string; id: string }>`
     SELECT alias_norm AS key, vehicle_id AS id FROM vehicle_aliases
@@ -139,14 +152,48 @@ async function detectVehicles(trx: Trx, words: string[]) {
   for (const r of rows) byKey.set(r.key, [...(byKey.get(r.key) ?? []), r.id]);
 
   const consumed = new Set<number>();
-  const vehicleIds = new Set<string>();
+  const found: { positions: number[]; ids: string[]; yearLike: boolean }[] = [];
   for (const [key, positions] of grams) {
     const ids = byKey.get(key);
     if (ids === undefined || positions.some((p) => consumed.has(p))) continue;
     positions.forEach((p) => consumed.add(p));
-    ids.forEach((id) => vehicleIds.add(id));
+    found.push({ positions, ids, yearLike: YEAR.test(key) });
   }
-  return { vehicleIds: [...vehicleIds], rest: words.filter((_, i) => !consumed.has(i)) };
+  // A year-like word that names a vehicle ("2008") names it only when it is the only
+  // vehicle named or in the lineage of another one ("peugeot 2008"); after another vehicle
+  // it is the year ("corolla 2008").
+  const others = found.filter((f) => !f.yearLike).flatMap((f) => f.ids);
+  if (others.length > 0) {
+    const yearIds = found.filter((f) => f.yearLike).flatMap((f) => f.ids);
+    const lineage = await ancestorsOf(trx, [...others, ...yearIds]);
+    const related = (id: string) =>
+      others.some(
+        (o) => (lineage.get(id) ?? []).includes(o) || (lineage.get(o) ?? []).includes(id),
+      );
+    for (const f of found.filter((x) => x.yearLike)) {
+      f.ids = f.ids.filter(related);
+      if (f.ids.length === 0) f.positions.forEach((p) => consumed.delete(p));
+    }
+  }
+  return {
+    vehicleIds: [...new Set(found.flatMap((f) => f.ids))],
+    vehicleWords: words.filter((_, i) => consumed.has(i)),
+    rest: words.filter((_, i) => !consumed.has(i)),
+  };
+}
+
+/** Every ancestor of each given vehicle. */
+async function ancestorsOf(trx: Trx, ids: string[]): Promise<Map<string, string[]>> {
+  const { rows } = await sql<{ base: string; id: string }>`
+    WITH RECURSIVE up AS (
+      SELECT id AS base, parent_id AS id FROM vehicles WHERE id = ANY(${ids}::uuid[])
+      UNION
+      SELECT up.base, v.parent_id FROM vehicles v JOIN up ON v.id = up.id
+    )
+    SELECT base, id FROM up WHERE id IS NOT NULL`.execute(trx);
+  const map = new Map<string, string[]>();
+  for (const r of rows) map.set(r.base, [...(map.get(r.base) ?? []), r.id]);
+  return map;
 }
 
 /**
@@ -206,12 +253,8 @@ interface NumberRow {
   archived: boolean;
 }
 
-/**
- * Parts whose number or SKU matches a candidate, exact matches first. Within each run of
- * number tokens only the longest join that matched anything counts: "04465 60320" finds
- * 0446560320 and not every number that merely starts with 04465.
- */
-async function numberMatches(trx: Trx, numbers: NumberCandidate[]) {
+/** Number and SKU rows matching any of the candidates, exact matches first. */
+async function numberRows(trx: Trx, numbers: NumberCandidate[]): Promise<NumberRow[]> {
   const prefixes = numbers.filter((n) => !n.exactOnly).map((n) => likePrefix(n.value));
   const values = numbers.map((n) => n.value);
   // OR-ed prefix LIKEs (not LIKE ANY), so each can use the text_pattern_ops index.
@@ -238,22 +281,40 @@ async function numberMatches(trx: Trx, numbers: NumberCandidate[]) {
      WHERE (${matching('p.sku_norm')})
      ORDER BY ${order('p.sku_norm')}
      LIMIT 50`.execute(trx);
+  return [...byNumber, ...bySku];
+}
 
+/**
+ * Parts whose number or SKU matches a candidate, exact matches first. Within each run of
+ * number tokens only the longest join that matched anything counts: "04465 60320" finds
+ * 0446560320 and not every number that merely starts with 04465. Longer joins are looked
+ * up first, so the many numbers a short prefix matches never crowd out a longer match.
+ */
+async function numberMatches(trx: Trx, numbers: NumberCandidate[]) {
   const matches = (n: NumberCandidate, norm: string) =>
     norm === n.value || (!n.exactOnly && norm.startsWith(n.value));
-  // The longest join that matched, per run.
-  const best = new Map<number, number>();
-  for (const row of [...byNumber, ...bySku]) {
-    for (const n of numbers) {
-      if (matches(n, row.norm)) best.set(n.run, Math.max(best.get(n.run) ?? 0, n.span));
+  const open = new Set(numbers.map((n) => n.run));
+  const counted: NumberCandidate[] = [];
+  const rows: NumberRow[] = [];
+  for (let span = Math.max(...numbers.map((n) => n.span)); span >= 1; span--) {
+    const batch = numbers.filter((n) => n.span === span && open.has(n.run));
+    if (batch.length === 0) continue;
+    const found = await numberRows(trx, batch);
+    for (const run of new Set(batch.map((n) => n.run))) {
+      const ofRun = batch.filter((n) => n.run === run);
+      if (!found.some((r) => ofRun.some((n) => matches(n, r.norm)))) continue;
+      open.delete(run);
+      counted.push(...ofRun);
     }
+    rows.push(...found);
   }
-  const counted = numbers.filter((n) => best.get(n.run) === n.span);
   const hits = new Map<string, { strength: number; archived: boolean }>();
+  const matched = new Set<NumberCandidate>();
   let reported: { value: string; strength: number; span: number } | null = null;
-  for (const row of [...byNumber, ...bySku]) {
+  for (const row of rows) {
     for (const n of counted) {
       if (!matches(n, row.norm)) continue;
+      matched.add(n);
       const strength = row.norm === n.value ? 2 : 1;
       const prev = hits.get(row.part_id);
       if (prev === undefined || strength > prev.strength) {
@@ -268,7 +329,7 @@ async function numberMatches(trx: Trx, numbers: NumberCandidate[]) {
       }
     }
   }
-  return { hits, counted, reported: reported?.value ?? null };
+  return { hits, matched: [...matched], reported: reported?.value ?? null };
 }
 
 /**
@@ -315,6 +376,13 @@ export async function searchCatalog(
   const years =
     yearValues.length === 0 ? null : { from: Math.min(...yearValues), to: Math.max(...yearValues) };
   const textVehicles = await mostSpecific(trx, detected.vehicleIds);
+  // Words read as a vehicle or as the year are not part numbers as well, unless the query
+  // is that one word (a numeric SKU such as "2015").
+  const readAs = new Set([...detected.vehicleWords, ...yearWords]);
+  const candidates =
+    interpretation.words.length <= 1
+      ? interpretation.numbers
+      : interpretation.numbers.filter((n) => !n.words.every((w) => readAs.has(w)));
   // A vehicle chosen in the UI restricts the typed one (and the other way round).
   let closure: string[] | null = null;
   if (textVehicles.length > 0) closure = await vehicleClosure(trx, textVehicles, years);
@@ -329,13 +397,13 @@ export async function searchCatalog(
 
   // 1. Part number / SKU matches (exact before prefix).
   const numbers =
-    interpretation.numbers.length === 0
+    candidates.length === 0
       ? {
           hits: new Map<string, { strength: number; archived: boolean }>(),
-          counted: [],
+          matched: [],
           reported: null,
         }
-      : await numberMatches(trx, interpretation.numbers);
+      : await numberMatches(trx, candidates);
   const replacements = await currentReplacements(
     trx,
     [...numbers.hits.entries()].filter(([, h]) => h.archived).map(([id]) => id),
@@ -357,8 +425,9 @@ export async function searchCatalog(
   }
 
   // 2. Words (all must match the part's search text), optionally restricted to vehicles.
-  // Years and the words of the numbers that matched are not required words.
-  const numberWords = new Set(numbers.counted.flatMap((n) => n.words));
+  // Years and the words of the numbers that matched are not required words; the words of
+  // a number that matched nothing still are.
+  const numberWords = new Set(numbers.matched.flatMap((n) => n.words));
   const words = detected.rest.filter((w) => !YEAR.test(w) && !numberWords.has(w));
   let textHits: { id: string; score: number }[] = [];
   // A closure with no vehicle left (a chosen vehicle and another one typed) matches nothing.
@@ -456,18 +525,45 @@ export async function searchCatalog(
   const list = await defaultPriceList(trx, currency);
   const prices =
     list === undefined ? new Map<string, string>() : await currentPrices(trx, list.id, allIds, now);
+  // Quantities only, never cost: anyone signed in may see them (ADR 0022, ADR 0023).
+  const balances =
+    allIds.length === 0
+      ? []
+      : await trx
+          .selectFrom('stock_balances')
+          .select(['part_id', 'location_id', 'quantity'])
+          .where('part_id', 'in', allIds)
+          .where('quantity', '<>', 0)
+          .orderBy('location_id')
+          .execute();
+  const stockById = new Map<string, SearchStock>();
+  for (const b of balances) {
+    const s = stockById.get(b.part_id) ?? { total: 0, locations: [] };
+    s.total += b.quantity;
+    s.locations.push({ locationId: b.location_id, quantity: b.quantity });
+    stockById.set(b.part_id, s);
+  }
   /** Archived parts are never offered, as a result or as an alternative. */
   const hit = (id: string) => {
     const row = partById.get(id);
     if (row?.archived_at !== null) return null;
+    const stock = stockById.get(id) ?? { total: 0, locations: [] };
     const amount = prices.get(id);
-    return { part: toPartSummary(row), price: amount === undefined ? null : { amount, currency } };
+    return {
+      part: toPartSummary(row),
+      price: amount === undefined ? null : { amount, currency },
+      stock,
+    };
   };
-  // Best quality first, then cheapest, then SKU (scenario 1).
-  const byQualityThenPrice = (
-    a: { part: { qualityGrade: string | null; sku: string }; price: { amount: string } | null },
-    b: { part: { qualityGrade: string | null; sku: string }; price: { amount: string } | null },
-  ) =>
+  interface Ranked {
+    part: { qualityGrade: string | null; sku: string };
+    price: { amount: string } | null;
+    stock: SearchStock;
+  }
+  // What can be sold now first, then best quality, then cheapest, then SKU (scenario 1;
+  // product owner 2026-10-06, ADR 0023).
+  const byStockThenQualityThenPrice = (a: Ranked, b: Ranked) =>
+    Number(b.stock.total > 0) - Number(a.stock.total > 0) ||
     gradeRank(a.part.qualityGrade) - gradeRank(b.part.qualityGrade) ||
     (a.price === null ? 1 : 0) - (b.price === null ? 1 : 0) ||
     (a.price !== null && b.price !== null
@@ -488,6 +584,7 @@ export async function searchCatalog(
     interpretation: {
       text: words,
       year: years?.from ?? null,
+      yearTo: years?.to ?? null,
       partNumber: numberHits.size > 0 ? numbers.reported : null,
       vehicles: vehicles.map((v) => ({ id: v.id, name: v.name, level: v.level as 'model' })),
     },
@@ -500,7 +597,7 @@ export async function searchCatalog(
           return h === null ? null : { ...h, relation };
         })
         .filter((a) => a !== null)
-        .sort(byQualityThenPrice);
+        .sort(byStockThenQualityThenPrice);
       return [
         {
           ...base,

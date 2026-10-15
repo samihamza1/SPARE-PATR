@@ -35,6 +35,8 @@ export const ERROR_CODES = [
   'import.file_too_large',
   'import.already_applied',
   'import.not_editable',
+  // Too many files are being read at once: try again shortly.
+  'import.busy',
   // The target is archived: restore it first (a replacement part, a default price list).
   'catalog.archived',
   // Inventory (ADRs 0018-0021).
@@ -50,6 +52,15 @@ export const ERROR_CODES = [
   'stock.cost_required',
   'stock.review_unresolved',
   'idempotency.conflict',
+  'stock.no_replacement',
+  'stock.unit_mismatch',
+  'opening.not_ready',
+  'opening.exists',
+  'opening.not_applied',
+  // Posting found lines that became unpostable (opened elsewhere, part archived); review.
+  'opening.lines_changed',
+  'count.not_open',
+  'count.open_exists',
   'server.error',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -276,6 +287,100 @@ export const sessionSchema = z.object({
   userAgent: z.string().nullable(),
   current: z.boolean(),
 });
+
+/**
+ * Every action the API records in the audit log (invariant 7). The API can write no other,
+ * and the back office must translate each one.
+ */
+export const AUDIT_ACTIONS = [
+  'auth.login',
+  'auth.login_failed',
+  'auth.lockout',
+  'auth.logout',
+  'user.create',
+  'user.update',
+  'user.archive',
+  'user.password_reset',
+  'user.password_change',
+  'user.password_change_failed',
+  'role.create',
+  'role.update',
+  'role.grant',
+  'role.revoke',
+  'session.revoke',
+  'settings.change',
+  'tenant.provision',
+  'currency.create',
+  'currency.update',
+  'device.create',
+  'device.new_code',
+  'device.enroll',
+  'device.revoke',
+  'device.location',
+  'part.create',
+  'part.update',
+  'part.bulk_update',
+  'part.supersede',
+  'part.supersede_remove',
+  'part_number.add',
+  'part_number.remove',
+  'fitment.add',
+  'fitment.remove',
+  'interchange.link',
+  'interchange.unlink',
+  'brand.create',
+  'brand.update',
+  'category.create',
+  'category.update',
+  'vehicle.create',
+  'vehicle.update',
+  'vehicle_alias.create',
+  'vehicle_alias.remove',
+  'price_list.create',
+  'price_list.update',
+  'price.set',
+  'catalog.import',
+  'catalog.import_stage',
+  'catalog.import_discard',
+  'location.create',
+  'location.update',
+  'fx_rate.create',
+  // Stock documents, by kind.
+  'stock.opening',
+  'stock.adjustment',
+  'stock.transfer',
+  'stock.part_transfer',
+  'stock.count',
+  'stock.opening_posted',
+  'stock_count.open',
+  'stock_count.cancel',
+  'stock_review.resolve',
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/** What an audit entry is about; the audit log can be filtered by it. */
+export const AUDIT_ENTITY_TYPES = [
+  'user',
+  'role',
+  'session',
+  'tenant',
+  'currency',
+  'device',
+  'part',
+  'brand',
+  'category',
+  'vehicle',
+  'vehicle_alias',
+  'price_list',
+  'import_batch',
+  'location',
+  'fx_rate',
+  'stock_document',
+  'opening_stock',
+  'stock_count',
+  'stock_review_item',
+] as const;
+export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 
 export const auditEntrySchema = z.object({
   id: uuidSchema,

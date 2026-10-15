@@ -1,10 +1,11 @@
 import type { DB } from '@autoparts/db';
 import { newId } from '@autoparts/shared';
+import type { AuditAction, AuditEntityType } from '@autoparts/shared';
 import type { Transaction } from 'kysely';
 
 export interface AuditInput {
-  action: string;
-  entityType: string;
+  action: AuditAction;
+  entityType: AuditEntityType;
   entityId?: string | null;
   before?: unknown;
   after?: unknown;

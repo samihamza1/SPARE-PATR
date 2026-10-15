@@ -18,6 +18,7 @@ const STOCK = {
   insufficient: 'ST001',
   inactiveLocation: 'ST002',
   hasStock: 'ST003',
+  archivedPart: 'ST005',
 } as const;
 
 let tenant: string;
@@ -158,6 +159,8 @@ async function receive(
   locationId: string,
   qty: number,
   value: string,
+  /** Runs after the moves are inserted, before the transaction commits. */
+  beforeCommit?: () => Promise<void>,
 ) {
   await withTenant(app, tenantId, async (trx) => {
     const before = (await lockCosts(trx, [partId])).get(partId) ?? EMPTY_COST_STATE;
@@ -196,7 +199,25 @@ async function receive(
       }),
     );
     await trx.insertInto('stock_moves').values(rows).execute();
+    await beforeCommit?.();
   });
+}
+
+/** A promise with its resolver, to hold a transaction open while another one runs. */
+function gate(): { promise: Promise<void>; open: () => void } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => (open = resolve));
+  return { promise, open };
+}
+
+/** 'blocked' when the promise is still pending after a while, else how it settled. */
+async function stateAfterWait(p: Promise<unknown>): Promise<string> {
+  const pending = new Promise<string>((resolve) =>
+    setTimeout(() => {
+      resolve('blocked');
+    }, 300),
+  );
+  return Promise.race([p.then(() => 'settled'), pending]);
 }
 
 beforeAll(async () => {
@@ -594,6 +615,15 @@ describe('negative stock', () => {
 });
 
 describe('catalog guards', () => {
+  const archivePart = (p: string) =>
+    withTenant(app, tenant, (trx) =>
+      trx.updateTable('parts').set({ archived_at: new Date() }).where('id', '=', p).execute(),
+    );
+  const archiveLocation = (l: string) =>
+    withTenant(app, tenant, (trx) =>
+      trx.updateTable('locations').set({ archived_at: new Date() }).where('id', '=', l).execute(),
+    );
+
   it('refuses to archive a part or change its unit while it has stock', async () => {
     const p = await newPart(tenant);
     await receive(tenant, p, store, 1, '1.00');
@@ -605,6 +635,128 @@ describe('catalog guards', () => {
       );
       expect(code).toBe(STOCK.hasStock);
     }
+  });
+
+  it('refuses stock on an archived part', async () => {
+    const p = await newPart(tenant);
+    await archivePart(p);
+    expect(await rejects(receive(tenant, p, store, 1, '1.00'))).toBe(STOCK.archivedPart);
+  });
+
+  it('makes archiving a part wait for a move in flight, then refuses it', async () => {
+    const p = await newPart(tenant);
+    const hold = gate();
+    const moved = gate();
+    const move = receive(tenant, p, store, 5, '5.00', async () => {
+      moved.open();
+      await hold.promise;
+    });
+    await moved.promise;
+    const archive = rejects(archivePart(p));
+    expect(await stateAfterWait(archive)).toBe('blocked');
+    hold.open();
+    await move;
+    expect(await archive).toBe(STOCK.hasStock);
+  });
+
+  it('makes a move wait for an archive in flight, then refuses it', async () => {
+    const p = await newPart(tenant);
+    const hold = gate();
+    const archived = gate();
+    const archive = withTenant(app, tenant, async (trx) => {
+      await trx.updateTable('parts').set({ archived_at: new Date() }).where('id', '=', p).execute();
+      archived.open();
+      await hold.promise;
+    });
+    await archived.promise;
+    const move = rejects(receive(tenant, p, store, 5, '5.00'));
+    expect(await stateAfterWait(move)).toBe('blocked');
+    hold.open();
+    await archive;
+    expect(await move).toBe(STOCK.archivedPart);
+  });
+
+  it('makes archiving a location wait for a move into it, then refuses it', async () => {
+    const p = await newPart(tenant);
+    const l = await newLocation(tenant, `Race ${newId().slice(-6)}`, 'warehouse');
+    const hold = gate();
+    const moved = gate();
+    const move = receive(tenant, p, l, 2, '2.00', async () => {
+      moved.open();
+      await hold.promise;
+    });
+    await moved.promise;
+    const archive = rejects(archiveLocation(l));
+    expect(await stateAfterWait(archive)).toBe('blocked');
+    hold.open();
+    await move;
+    expect(await archive).toBe(STOCK.hasStock);
+  });
+
+  it('applies moves to the real tables even when the caller shadows them with temp tables', async () => {
+    const p = await newPart(tenant);
+    await receive(tenant, p, store, 1, '13.15');
+    const code = await rejects(
+      withTenant(app, tenant, async (trx) => {
+        for (const table of ['stock_costs', 'stock_balances']) {
+          await sql
+            .raw(
+              `CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS) ON COMMIT DROP;
+               GRANT ALL ON pg_temp.${table} TO autoparts_owner;`,
+            )
+            .execute(trx);
+        }
+        // A fake state the move is computed from: nothing in stock.
+        await sql`INSERT INTO pg_temp.stock_costs (tenant_id, part_id) VALUES (${tenant}, ${p})`.execute(
+          trx,
+        );
+        const documentId = await newDocument(trx, tenant);
+        await trx
+          .insertInto('stock_moves')
+          .values(
+            moveRow(tenant, {
+              partId: p,
+              locationId: store,
+              kind: 'adjustment',
+              reason: 'found',
+              quantity: 500,
+              functionalAmount: '0.00',
+              before: EMPTY_COST_STATE,
+              prevLocation: 0,
+              documentId,
+            }),
+          )
+          .execute();
+      }),
+    );
+    expect(code).toBe(STOCK.concurrentChange);
+  });
+});
+
+describe('closed documents', () => {
+  it('keeps a closed count closed', async () => {
+    const id = newId();
+    await withTenant(app, tenant, async (trx) => {
+      await trx
+        .insertInto('stock_counts')
+        .values({ id, tenant_id: tenant, location_id: store, scope: 'all', created_by: user })
+        .execute();
+      await trx
+        .updateTable('stock_counts')
+        .set({ status: 'cancelled', closed_at: new Date(), closed_by: user })
+        .where('id', '=', id)
+        .execute();
+    });
+    const code = await rejects(
+      withTenant(app, tenant, (trx) =>
+        trx
+          .updateTable('stock_counts')
+          .set({ status: 'open', closed_at: null, closed_by: null })
+          .where('id', '=', id)
+          .execute(),
+      ),
+    );
+    expect(code).toBe(SQLSTATE.checkViolation);
   });
 });
 

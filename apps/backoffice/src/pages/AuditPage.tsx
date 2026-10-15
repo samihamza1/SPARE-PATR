@@ -1,3 +1,4 @@
+import { AUDIT_ENTITY_TYPES } from '@autoparts/shared';
 import type { AuditEntry, User } from '@autoparts/shared';
 import { Button, Code, Group, Select, Stack, Table, Text, Title } from '@mantine/core';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -9,21 +10,6 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { useFormatDateTime } from '../format';
 
 const PAGE = 50;
-const ENTITY_TYPES = [
-  'user',
-  'role',
-  'session',
-  'tenant',
-  'currency',
-  'device',
-  'part',
-  'brand',
-  'category',
-  'vehicle',
-  'vehicle_alias',
-  'price_list',
-  'import_batch',
-] as const;
 
 type Snapshot = Record<string, unknown>;
 const isSnapshot = (v: unknown): v is Snapshot =>
@@ -114,7 +100,7 @@ export function AuditPage() {
           aria-label={t('audit.entityType')}
           placeholder={t('audit.allEntities')}
           clearable
-          data={ENTITY_TYPES.map((e) => ({ value: e, label: t(`audit.entities.${e}`) }))}
+          data={AUDIT_ENTITY_TYPES.map((e) => ({ value: e, label: t(`audit.entities.${e}`) }))}
           value={entityType}
           onChange={setEntityType}
         />

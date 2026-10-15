@@ -247,3 +247,43 @@ describe('last administrator', () => {
     expect(await adminsLeft(s)).toHaveLength(1);
   });
 });
+
+describe('an actor archived while its request waits for the admin lock', () => {
+  it('is refused once the archive commits', async () => {
+    const s = await provisionShop(env);
+    const owner = await loggedIn(env, s);
+    const role = await createRole(owner, 'user_admin', ['users.manage']);
+    const managerId = await createUser(owner, 'manager', role);
+    const manager = await loggedIn(env, s, 'manager', 'manager passphrase');
+    const tillId = await createUser(owner, 'till');
+    // The lock holder plays the owner's archive: it commits while the manager's request waits.
+    const res = await whileLocked(
+      env,
+      s.tenantId,
+      async (trx) => {
+        await sql`SELECT pg_advisory_xact_lock(1094995278, hashtext(${s.tenantId}::text))`.execute(
+          trx,
+        );
+        await trx
+          .updateTable('users')
+          .set({ archived_at: new Date() })
+          .where('id', '=', managerId)
+          .execute();
+        await trx
+          .updateTable('sessions')
+          .set({ revoked_at: new Date(), revoked_reason: 'user_archived' })
+          .where('user_id', '=', managerId)
+          .execute();
+      },
+      async (release) => {
+        const pending = manager.post(`/users/${tillId}/password`, {
+          password: 'taken over passphrase',
+        });
+        await waitForLockWaiters(env, 1);
+        await release();
+        return pending;
+      },
+    );
+    expect(res.statusCode).toBe(401);
+  });
+});

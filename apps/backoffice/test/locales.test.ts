@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AUDIT_ACTIONS,
+  AUDIT_ENTITY_TYPES,
   ERROR_CODES,
   PERMISSIONS,
   addFitmentSchema,
@@ -25,10 +27,20 @@ import {
   resetPasswordSchema,
   setPriceSchema,
   skipImportRowsSchema,
+  adjustmentRequestSchema,
+  approveCountSchema,
+  createCountSchema,
   createFxRateSchema,
   createLocationSchema,
+  createOpeningSchema,
+  enterCountSchema,
+  partTransferRequestSchema,
+  resolveReviewItemSchema,
   setDeviceLocationSchema,
+  transferRequestSchema,
   updateLocationSchema,
+  updateOpeningLineSchema,
+  updateOpeningSchema,
   supersedeSchema,
   updateBrandSchema,
   updateCategorySchema,
@@ -142,10 +154,20 @@ const REQUEST_SCHEMAS = [
   inspectImportSchema,
   createImportSchema,
   skipImportRowsSchema,
+  adjustmentRequestSchema,
+  approveCountSchema,
+  createCountSchema,
   createFxRateSchema,
   createLocationSchema,
+  createOpeningSchema,
+  enterCountSchema,
+  partTransferRequestSchema,
+  resolveReviewItemSchema,
   setDeviceLocationSchema,
+  transferRequestSchema,
   updateLocationSchema,
+  updateOpeningLineSchema,
+  updateOpeningSchema,
 ] as unknown as ZodLike[];
 
 describe('locales', () => {
@@ -163,6 +185,13 @@ describe('locales', () => {
     for (const locale of [ar, en]) {
       const labels = keys(locale.permissions);
       expect(labels.sort()).toEqual([...PERMISSIONS].sort());
+    }
+  });
+
+  it('names every audit action and entity type the API can record, in both languages', () => {
+    for (const locale of [ar, en]) {
+      expect(AUDIT_ACTIONS.filter((a) => !has(locale.audit.actions, a))).toEqual([]);
+      expect(AUDIT_ENTITY_TYPES.filter((e) => !has(locale.audit.entities, e))).toEqual([]);
     }
   });
 

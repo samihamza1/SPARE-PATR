@@ -232,7 +232,9 @@ class SheetCounter {
         this.dataRowCount < this.rowCount ? Math.min(this.held, this.dataRowCount) : this.held,
       dataRows: this.dataRowCount,
       dataColumns: this.dataColumnCount,
-      ambiguous: this.ambiguous,
+      // The library does not always throw where the scan stops (a cell with an empty value
+      // outside a row is skipped), so a sheet the scan could not finish counts as too large.
+      ambiguous: this.ambiguous || this.failed,
     };
   }
 }

@@ -119,3 +119,20 @@ These changes replace steps 2–5 of "Interpreting a query" and refine the resul
     with `matchedBy: 'replacement'` (BRIEF scenario 7).
 - Measured on 50,000 synthetic parts with prices in effect: p50 about 57 ms, p95 75 to
   100 ms between runs (target 200 ms).
+
+## Addendum (2026-10-13, Sprint 4 review)
+
+- **Letter groups printed apart from the digits** join a number run: a token of one to
+  three Latin letters next to a number token ("W 712/75", "HU 7008 z", "A 271 180 00 09").
+  Runs join up to six tokens, and a candidate always holds a digit. Longer words still
+  never join ("pads 04465 60320").
+- **Longest joins are looked up first**, one span at a time, so the many numbers a short
+  join matches never crowd a longer join's match out of the lookup's limit.
+- **Only matched numbers lose their words**: the words of a candidate that matched
+  nothing stay required words, so a stray letter cannot become a match-everything word.
+- **A year-like word names a vehicle only in context**: it is read as a vehicle when it is
+  the only vehicle named, or in the lineage of another named one ("peugeot 2008");
+  otherwise it is the year ("corolla 2008" searches Corolla in 2008).
+- **Words read as a vehicle or as the year are not part numbers too**, unless the query is
+  that one word (a numeric SKU such as "2015").
+- The interpretation reports a range of years as `year` and `yearTo`.

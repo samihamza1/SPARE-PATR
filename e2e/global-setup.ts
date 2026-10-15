@@ -9,6 +9,7 @@ import { buildXlsx } from '../apps/api/test/xlsx';
 
 export const SHOP_FILE = fileURLToPath(new URL('./.state/shop.json', import.meta.url));
 export const LAND_FILE = fileURLToPath(new URL('./.state/land.xlsx', import.meta.url));
+export const STOCK_FILE = fileURLToPath(new URL('./.state/stock.xlsx', import.meta.url));
 
 /** Shared (platform) vehicle rows, created once per database. */
 async function platformVehicle(
@@ -46,6 +47,21 @@ function landFile(): Buffer {
       ['04465-60320', 'Front pads trade', 'فحمات امامية تجاري', 'LC', { n: '40' }],
       ['04465-60320', 'Front pads economy', 'فحمات امامية اقتصادي', 'LC', { n: '25' }],
       ['90915-YZZD4', 'Oil filter', 'مصفي زيت', 'LC', { n: '12.0000000000001' }],
+    ],
+  });
+}
+
+/**
+ * Shaped like a stock sheet with costs in another currency (BBB) and quantities: a repeated
+ * part number (its quantities add up) and a row without cost (entered before posting).
+ */
+function stockFile(): Buffer {
+  return buildXlsx({
+    STOCK: [
+      ['Part', 'Name EN', 'Cost', 'Qty'],
+      ['43512-60190', 'Brake disc', { n: '36.725' }, { n: '2' }],
+      ['43512-60190', 'Brake disc', { n: '36.725' }, { n: '1' }],
+      ['17801-38030', 'Air filter', null, { n: '4' }],
     ],
   });
 }
@@ -106,4 +122,5 @@ export default async function globalSetup(): Promise<void> {
   mkdirSync(new URL('./.state/', import.meta.url), { recursive: true });
   writeFileSync(SHOP_FILE, JSON.stringify(shop));
   writeFileSync(LAND_FILE, landFile());
+  writeFileSync(STOCK_FILE, stockFile());
 }
