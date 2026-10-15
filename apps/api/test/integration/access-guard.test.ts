@@ -92,7 +92,8 @@ describe('route access guard', () => {
   });
 
   it('lets the cashier use routes open to any signed-in user', async () => {
-    expect((await cashier.get('/auth/me')).json<MeResponse>().permissions).toEqual([]);
+    // Cashiers only take part in stock counts (product owner, 2026-10-06).
+    expect((await cashier.get('/auth/me')).json<MeResponse>().permissions).toEqual(['stock.count']);
     expect((await cashier.get('/currencies')).statusCode).toBe(200);
     // Reading and searching the catalog only needs a session (Sprint 3).
     expect((await cashier.get('/catalog/search?q=filter')).statusCode).toBe(200);

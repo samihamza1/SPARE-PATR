@@ -91,3 +91,29 @@ export function roundQuotient(n: bigint, d: bigint, mode: RoundingMode): bigint 
       return q % 2n === 0n ? q : away;
   }
 }
+
+/**
+ * Divides exactly and rounds once to `scale` decimal places. The quotient is never
+ * rounded twice (no intermediate decimal.js precision limit), so values such as
+ * V * q / Q in average costing or amount / rate in FX conversion are always within one
+ * rounding of the true result.
+ */
+export function divideRounded(
+  numerator: DecimalInput,
+  denominator: DecimalInput,
+  scale: number,
+  mode: RoundingMode,
+): Decimal {
+  assertScale(scale);
+  const n = dec(numerator);
+  const d = dec(denominator);
+  if (d.isZero()) throw new RangeError('Division by zero');
+  const common = Math.max(n.decimalPlaces(), d.decimalPlaces());
+  let top = toBigInt(shift(n, common)) * 10n ** BigInt(scale);
+  let bottom = toBigInt(shift(d, common));
+  if (bottom < 0n) {
+    top = -top;
+    bottom = -bottom;
+  }
+  return shift(new Decimal(roundQuotient(top, bottom, mode).toString()), -scale);
+}

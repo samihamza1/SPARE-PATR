@@ -116,7 +116,27 @@
     "costCurrency": "Cost currency",
     "skuPrefix": "SKU prefix",
     "rowIds": "Rows",
-    "skipped": "Skipped"
+    "skipped": "Skipped",
+    "amount": "Amount",
+    "asOf": "As of",
+    "base": "Currency",
+    "batchId": "Import",
+    "costs": "Unit costs",
+    "counted": "Counted",
+    "documentId": "Document",
+    "excluded": "Excluded",
+    "fromLocationId": "From",
+    "fxRateId": "Exchange rate",
+    "lines": "Lines",
+    "locationId": "Location",
+    "partIds": "Parts",
+    "quantity": "Quantity",
+    "quote": "Quoted in",
+    "rate": "Rate",
+    "rateDate": "Date",
+    "scope": "What to count",
+    "toLocationId": "To",
+    "unitCost": "Unit cost"
   },
   "validation": {
     "invalid": "Invalid value",
@@ -161,6 +181,19 @@
     "currency": {
       "cash_increment_positive": "The cash increment must be greater than zero",
       "cash_increment_scale": "The cash increment has more decimals than the currency"
+    },
+    "count": {
+      "scope": "Choose the category or the parts that match what is counted"
+    },
+    "fx": {
+      "same_currency": "Choose two different currencies"
+    },
+    "stock": {
+      "cost_on_issue": "A unit cost is entered only for stock coming in",
+      "duplicate_part": "A part appears twice; enter it once",
+      "reason_direction": "This reason does not match the direction of the quantity",
+      "same_location": "Choose two different locations",
+      "zero_quantity": "The quantity cannot be zero"
     }
   },
   "errors": {
@@ -193,6 +226,24 @@
       "already_applied": "This sheet of this file was already imported",
       "not_editable": "This import was already applied or discarded"
     },
+    "settings": { "incomplete": "A business rule for this is not set yet; set it in Settings" },
+    "location": {
+      "archived": "That location is archived, or it is the default shop",
+      "has_devices": "Move the devices of this location to another shop first",
+      "not_a_shop": "Only a shop can sell or be the default location"
+    },
+    "fx": {
+      "rate_missing": "No exchange rate is recorded for this currency and date",
+      "future_date": "The date cannot be in the future"
+    },
+    "stock": {
+      "insufficient": "Not enough stock at that location",
+      "concurrent_change": "Stock changed at the same moment; try again",
+      "has_stock": "Not possible while there is stock",
+      "cost_required": "Enter a unit cost: this part has no known cost yet",
+      "review_unresolved": "Not resolved yet: the stock is still below zero or has no cost"
+    },
+    "idempotency": { "conflict": "This document was already sent with different content" },
     "server": { "error": "Something went wrong" },
     "catalog": {
       "archived": "It is archived; restore it first"
@@ -207,7 +258,17 @@
     "audit": { "read": "View audit log" },
     "cost": { "view": "See cost and margin" },
     "catalog": { "manage": "Manage the catalog", "import": "Import catalog files" },
-    "prices": { "manage": "Manage prices" }
+    "prices": { "manage": "Manage prices" },
+    "locations": { "manage": "Manage locations and warehouses" },
+    "fx": { "manage": "Enter exchange rates" },
+    "stock": {
+      "adjust": "Adjust stock",
+      "transfer": "Transfer stock between locations",
+      "count": "Take part in stock counts",
+      "approve_count": "Approve stock counts",
+      "review": "Review stock alerts",
+      "opening": "Enter opening stock"
+    }
   },
   "roles": {
     "title": "Roles and permissions",

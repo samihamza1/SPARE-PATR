@@ -25,6 +25,10 @@ import {
   resetPasswordSchema,
   setPriceSchema,
   skipImportRowsSchema,
+  createFxRateSchema,
+  createLocationSchema,
+  setDeviceLocationSchema,
+  updateLocationSchema,
   supersedeSchema,
   updateBrandSchema,
   updateCategorySchema,
@@ -138,6 +142,10 @@ const REQUEST_SCHEMAS = [
   inspectImportSchema,
   createImportSchema,
   skipImportRowsSchema,
+  createFxRateSchema,
+  createLocationSchema,
+  setDeviceLocationSchema,
+  updateLocationSchema,
 ] as unknown as ZodLike[];
 
 describe('locales', () => {
