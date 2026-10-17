@@ -69,6 +69,9 @@ const CountPage = lazy(() =>
 const ReviewPage = lazy(() =>
   import('./pages/inventory/ReviewPage').then((m) => ({ default: m.ReviewPage })),
 );
+const SuppliersPage = lazy(() =>
+  import('./pages/purchasing/SuppliersPage').then((m) => ({ default: m.SuppliersPage })),
+);
 
 function Page({ children }: { children: ReactNode }) {
   return (
@@ -293,6 +296,16 @@ export function App() {
             <RequirePermission permission="stock.count">
               <Page>
                 <CountPage />
+              </Page>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="purchasing/suppliers"
+          element={
+            <RequirePermission permission="purchases.view">
+              <Page>
+                <SuppliersPage />
               </Page>
             </RequirePermission>
           }
