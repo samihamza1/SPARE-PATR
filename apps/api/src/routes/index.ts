@@ -14,6 +14,7 @@ import { fxRateRoutes } from './inventory/fx-rates';
 import { locationRoutes } from './inventory/locations';
 import { openingRoutes } from './inventory/opening';
 import { stockRoutes } from './inventory/stock';
+import { supplierRoutes } from './purchasing/suppliers';
 import { roleRoutes } from './roles';
 import { sessionRoutes } from './sessions';
 import { settingsRoutes } from './settings';
@@ -54,4 +55,5 @@ export function registerPlatformRoutes(app: FastifyInstance, deps: PlatformDeps)
   stockDocumentRoutes(app, deps);
   openingRoutes(app, deps);
   countRoutes(app, deps);
+  supplierRoutes(app, deps);
 }

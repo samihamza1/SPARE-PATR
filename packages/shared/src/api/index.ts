@@ -61,6 +61,12 @@ export const ERROR_CODES = [
   'opening.lines_changed',
   'count.not_open',
   'count.open_exists',
+  // Purchasing (ADRs 0026-0028).
+  'supplier.archived',
+  // Another part already uses this number for the same supplier.
+  'supplier_part.taken',
+  // The currency exists but is switched off in Settings.
+  'currency.inactive',
   'server.error',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -355,6 +361,10 @@ export const AUDIT_ACTIONS = [
   'stock_count.open',
   'stock_count.cancel',
   'stock_review.resolve',
+  'supplier.create',
+  'supplier.update',
+  'supplier_part.add',
+  'supplier_part.remove',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -379,6 +389,7 @@ export const AUDIT_ENTITY_TYPES = [
   'opening_stock',
   'stock_count',
   'stock_review_item',
+  'supplier',
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 

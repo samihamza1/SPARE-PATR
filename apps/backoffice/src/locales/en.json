@@ -21,7 +21,8 @@
     "parts": "Parts",
     "vehicles": "Vehicles",
     "catalogSetup": "Catalog setup",
-    "imports": "Import catalog"
+    "imports": "Import catalog",
+    "suppliers": "Suppliers"
   },
   "auth": {
     "title": "Sign in",
@@ -54,7 +55,8 @@
     "copied": "Copied",
     "removeNamed": "Remove {{name}}",
     "label": "{{label}}:",
-    "labelValue": "{{label}}: {{value}}"
+    "labelValue": "{{label}}: {{value}}",
+    "search": "Search"
   },
   "fields": {
     "username": "Username",
@@ -149,7 +151,9 @@
     "rateDate": "Date",
     "scope": "What to count",
     "toLocationId": "To",
-    "unitCost": "Unit cost"
+    "unitCost": "Unit cost",
+    "defaultCurrency": "Default currency",
+    "phone": "Phone"
   },
   "validation": {
     "invalid": "Invalid value",
@@ -207,6 +211,9 @@
       "reason_direction": "This reason does not match the direction of the quantity",
       "same_location": "Choose two different locations",
       "zero_quantity": "The quantity cannot be zero"
+    },
+    "supplier_part": {
+      "empty_number": "Enter a number with at least one letter or digit"
     }
   },
   "errors": {
@@ -273,6 +280,15 @@
     "server": { "error": "Something went wrong" },
     "catalog": {
       "archived": "It is archived; restore it first"
+    },
+    "supplier": {
+      "archived": "This supplier is archived: restore it first"
+    },
+    "supplier_part": {
+      "taken": "This supplier number already points to another part"
+    },
+    "currency": {
+      "inactive": "This currency is switched off in Settings"
     }
   },
   "permissions": {
@@ -293,7 +309,13 @@
       "count": "Take part in stock counts",
       "approve_count": "Approve stock counts",
       "review": "Review stock alerts",
-      "opening": "Enter opening stock"
+      "opening": "Enter opening stock",
+      "revalue": "Revalue stock (value only)"
+    },
+    "purchases": {
+      "view": "View purchases and suppliers",
+      "manage": "Manage suppliers and prepare purchases",
+      "post": "Post purchase receipts"
     }
   },
   "roles": {
@@ -407,7 +429,8 @@
       "stock_document": "Stock documents",
       "opening_stock": "Opening stock",
       "stock_count": "Counts",
-      "stock_review_item": "Review items"
+      "stock_review_item": "Review items",
+      "supplier": "Supplier"
     },
     "actions": {
       "auth": {
@@ -509,6 +532,14 @@
       },
       "stock_review": {
         "resolve": "Review item resolved"
+      },
+      "supplier": {
+        "create": "Supplier added",
+        "update": "Supplier changed"
+      },
+      "supplier_part": {
+        "add": "Supplier number mapped",
+        "remove": "Supplier number removed"
       }
     },
     "field": "Field",
@@ -963,5 +994,34 @@
     "opened": "Opened",
     "note": "Resolution note",
     "resolve": "Resolve"
+  },
+  "suppliers": {
+    "title": "Suppliers",
+    "intro": "Who you buy from. Map each supplier's own part numbers once; later invoices from that supplier recognise them.",
+    "name": "Supplier name",
+    "defaultCurrency": "Default currency",
+    "defaultCurrencyHint": "Proposed for this supplier's invoices; each invoice can use another one.",
+    "phone": "Phone",
+    "note": "Note",
+    "add": "Add supplier",
+    "edit": "Edit supplier",
+    "archive": "Archive",
+    "restore": "Restore",
+    "archiveConfirm": "Archive {{name}}? It can be restored later.",
+    "archived": "Archived",
+    "status": "Status",
+    "showArchived": "Show archived suppliers",
+    "none": "No suppliers yet.",
+    "numbers": "Part numbers",
+    "numbersOf": "Part numbers of {{name}}",
+    "numbersIntro": "The numbers printed on this supplier's invoices, each pointing to one part of your catalog.",
+    "number": "Supplier number",
+    "part": "Part",
+    "choosePart": "Choose the part this number stands for",
+    "addNumber": "Map number",
+    "removeNumber": "Remove",
+    "removeNumberConfirm": "Remove the number {{number}}? Invoices will no longer recognise it.",
+    "noNumbers": "No numbers mapped yet.",
+    "partArchived": "Part archived"
   }
 }

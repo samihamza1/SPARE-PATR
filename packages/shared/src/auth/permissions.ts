@@ -27,6 +27,12 @@ export const PERMISSIONS = [
   'stock.approve_count',
   'stock.review',
   'stock.opening',
+  // Purchasing (Sprint 5). Every purchasing screen also needs cost.view (ADR 0026).
+  'purchases.view',
+  'purchases.manage',
+  'purchases.post',
+  // Changes a part's stock value without moving goods: owners only (product owner, 2026-10-16).
+  'stock.revalue',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -68,12 +74,16 @@ export const SYSTEM_ROLE_TEMPLATES: readonly RoleTemplate[] = [
       'stock.count',
       'stock.approve_count',
       'stock.review',
+      // Product owner, 2026-10-16: supervisors prepare and post purchases.
+      'purchases.view',
+      'purchases.manage',
+      'purchases.post',
     ],
   },
   {
     code: 'accountant',
     name: 'Accountant',
-    permissions: ['audit.read', 'cost.view', 'fx.manage'],
+    permissions: ['audit.read', 'cost.view', 'fx.manage', 'purchases.view'],
   },
   { code: 'cashier', name: 'Cashier', permissions: ['stock.count'] },
 ];

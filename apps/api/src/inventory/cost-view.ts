@@ -1,4 +1,5 @@
 import type { AuthContext } from '../auth/context';
+import { forbidden } from '../errors';
 
 /**
  * BRIEF: cashiers sell but never see cost or margin. Values of stock travel under a `cost`
@@ -6,6 +7,14 @@ import type { AuthContext } from '../auth/context';
  */
 export function seesCost(auth: Pick<AuthContext, 'permissions'>): boolean {
   return auth.permissions.has('cost.view');
+}
+
+/**
+ * Screens that show or enter values (opening stock, purchasing) need cost.view as well as
+ * their own permission; a route's access names one code only, so handlers call this.
+ */
+export function requireCostView(auth: Pick<AuthContext, 'permissions'>): void {
+  if (!seesCost(auth)) throw forbidden();
 }
 
 /** Drops `cost` from audit before/after snapshots for users without cost.view. */

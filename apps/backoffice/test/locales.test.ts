@@ -41,6 +41,10 @@ import {
   updateLocationSchema,
   updateOpeningLineSchema,
   updateOpeningSchema,
+  createSupplierSchema,
+  updateSupplierSchema,
+  addSupplierPartSchema,
+  resolveSupplierNumbersSchema,
   supersedeSchema,
   updateBrandSchema,
   updateCategorySchema,
@@ -168,6 +172,10 @@ const REQUEST_SCHEMAS = [
   updateLocationSchema,
   updateOpeningLineSchema,
   updateOpeningSchema,
+  createSupplierSchema,
+  updateSupplierSchema,
+  addSupplierPartSchema,
+  resolveSupplierNumbersSchema,
 ] as unknown as ZodLike[];
 
 describe('locales', () => {
