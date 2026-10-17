@@ -126,7 +126,7 @@ function SupplierPartsDrawer({ supplier, onClose }: { supplier: Supplier; onClos
     queryFn: () =>
       api<SupplierPartPage>(
         'GET',
-        `/suppliers/${supplier.id}/parts?limit=${PAGE}&offset=${offset}&q=${encodeURIComponent(q)}`,
+        `/suppliers/${supplier.id}/parts?limit=${String(PAGE)}&offset=${String(offset)}&q=${encodeURIComponent(q)}`,
       ),
   });
   const refresh = () =>
