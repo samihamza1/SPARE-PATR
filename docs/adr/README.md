@@ -47,3 +47,4 @@ Template:
 | [0023](0023-quantities-in-search.md)                | Quantities in search; alternatives in stock first           |
 | [0024](0024-opening-stock.md)                       | Opening stock from an imported sheet                        |
 | [0025](0025-adjustments-counts-and-review.md)       | Adjustments, transfers, counts and review                   |
+| [0026](0026-suppliers-and-supplier-part-numbers.md) | Suppliers and supplier part numbers                         |
