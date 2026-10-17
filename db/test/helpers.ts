@@ -77,6 +77,7 @@ export async function createRole(
 export const SQLSTATE = {
   insufficientPrivilege: '42501',
   foreignKeyViolation: '23503',
+  uniqueViolation: '23505',
   checkViolation: '23514',
   raiseException: 'P0001',
 } as const;
