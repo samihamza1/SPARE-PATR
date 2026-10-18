@@ -86,6 +86,11 @@ describe('suppliers', () => {
     expect(again.json<Supplier>().id).toBe(body.id);
     const changed = await supervisor.post('/suppliers', { ...body, name: 'Other' });
     expect(errorCode(changed)).toBe('idempotency.conflict');
+    // A late retry after an edit still answers 200, with the supplier as it is now.
+    await owner.patch(`/suppliers/${body.id}`, { phone: '+971 4 111' });
+    const late = await supervisor.post('/suppliers', body);
+    expect(late.statusCode).toBe(200);
+    expect(late.json<Supplier>().phone).toBe('+971 4 111');
     // Active suppliers have distinct names (after normalisation).
     const twin = await owner.post('/suppliers', { id: newId(), name: '  gulf   PARTS ' });
     expect(errorCode(twin)).toBe('resource.conflict');
@@ -228,6 +233,14 @@ describe('supplier part numbers', () => {
     expect(removed.statusCode, removed.body).toBe(200);
     const twice = await owner.post(`/suppliers/${supplier.id}/parts/${mapping.id}/remove`, {});
     expect(twice.statusCode).toBe(404);
+    // A late retry of the original create returns the mapping, marked removed.
+    const replay = await owner.post(`/suppliers/${supplier.id}/parts`, {
+      id: mapping.id,
+      partId: mapping.part.id,
+      number: mapping.number,
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json<SupplierPart>().removedAt).not.toBeNull();
     const remapped = await owner.post(`/suppliers/${supplier.id}/parts`, {
       id: newId(),
       partId: pads.id,
@@ -354,6 +367,24 @@ describe('resolving supplier numbers', () => {
     });
     expect(results[1]).toMatchObject({ status: 'candidates' });
     expect(results[1]?.candidates.map((p) => p.id)).toEqual([current.id]);
+  });
+
+  it('offers the replacement of a remembered part that is superseded but still active', async () => {
+    const old = await createPart('STR-900');
+    const current = await createPart('STR-901');
+    await owner.post(`/suppliers/${supplier.id}/parts`, {
+      id: newId(),
+      partId: old.id,
+      number: 'RC-STR',
+    });
+    await owner.post(`/catalog/parts/${old.id}/supersede`, { id: newId(), newPartId: current.id });
+    const [result] = (
+      await owner.post(`/suppliers/${supplier.id}/resolve`, { numbers: ['RC-STR'] })
+    ).json<ResolveSupplierNumbersResponse>().results;
+    expect(result).toMatchObject({
+      status: 'remembered',
+      mapping: { part: { id: old.id, archivedAt: null }, replacement: { id: current.id } },
+    });
   });
 
   it('is refused to cashiers and for unknown suppliers', async () => {

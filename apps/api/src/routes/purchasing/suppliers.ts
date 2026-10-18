@@ -26,6 +26,7 @@ import { PART_COLUMNS, toPartSummary } from '../../catalog/mappers';
 import { currentReplacements } from '../../catalog/search';
 import { ApiError, notFound } from '../../errors';
 import { retryOnDuplicate } from '../../inventory/documents';
+import { requestHash } from '../../inventory/idempotency';
 import type { Trx } from '../common';
 import { actorOf, inTenant, iso } from '../common';
 
@@ -86,6 +87,8 @@ async function loadMappings(
   supplierId: string,
   opts: {
     id?: string;
+    /** A lookup by id also finds a removed mapping (a replayed create returns it). */
+    includeRemoved?: boolean;
     q?: string | undefined;
     partId?: string | undefined;
     limit: number;
@@ -97,8 +100,8 @@ async function loadMappings(
     .innerJoin('parts as p', (j) =>
       j.onRef('p.tenant_id', '=', 'sp.tenant_id').onRef('p.id', '=', 'sp.part_id'),
     )
-    .where('sp.supplier_id', '=', supplierId)
-    .where('sp.removed_at', 'is', null);
+    .where('sp.supplier_id', '=', supplierId);
+  if (opts.includeRemoved !== true) q = q.where('sp.removed_at', 'is', null);
   if (opts.id !== undefined) q = q.where('sp.id', '=', opts.id);
   if (opts.partId !== undefined) q = q.where('sp.part_id', '=', opts.partId);
   if (opts.q !== undefined && opts.q !== '') {
@@ -118,6 +121,7 @@ async function loadMappings(
       'sp.supplier_id',
       'sp.number',
       'sp.created_at',
+      'sp.removed_at',
       'p.id',
       'p.sku',
       'p.name_ar',
@@ -138,13 +142,19 @@ async function loadMappings(
     supplierId: r.supplier_id,
     number: r.number,
     createdAt: r.created_at.toISOString(),
+    removedAt: iso(r.removed_at),
     part: toPartSummary(r),
   }));
   return { items, total: Number(counted?.total ?? 0) };
 }
 
-async function loadMapping(trx: Trx, supplierId: string, id: string): Promise<SupplierPart> {
-  const page = await loadMappings(trx, supplierId, { id, limit: 1, offset: 0 });
+async function loadMapping(
+  trx: Trx,
+  supplierId: string,
+  id: string,
+  includeRemoved = false,
+): Promise<SupplierPart> {
+  const page = await loadMappings(trx, supplierId, { id, includeRemoved, limit: 1, offset: 0 });
   const [mapping] = page.items;
   if (mapping === undefined) throw notFound();
   return mapping;
@@ -162,8 +172,9 @@ async function partSummaries(trx: Trx, ids: readonly string[]): Promise<Map<stri
 
 /**
  * Resolves supplier numbers exactly (ADR 0026; never guessed, ADR 0016): this supplier's
- * mapping first; otherwise the active parts whose catalog number or SKU is that number, an
- * archived part standing for the part that replaces it today; otherwise nothing.
+ * mapping first, with the part that replaces it today when it is archived or superseded;
+ * otherwise the active parts whose catalog number or SKU is that number, an archived part
+ * standing for the part that replaces it today; otherwise nothing.
  */
 async function resolveNumbers(
   trx: Trx,
@@ -197,8 +208,11 @@ async function resolveNumbers(
     ...mapped.map((m) => m.part_id),
     ...matches.map((m) => m.part_id),
   ]);
+  // Remembered parts are checked for any active supersession; candidates only when archived.
   const archived = [...parts.values()].filter((p) => p.archivedAt !== null).map((p) => p.id);
-  const replacementOf = await currentReplacements(trx, archived);
+  const replacementOf = await currentReplacements(trx, [
+    ...new Set([...mapped.map((m) => m.part_id), ...archived]),
+  ]);
   const replacements = await partSummaries(trx, [...replacementOf.values()]);
   const replacement = (id: string): PartSummary | null => {
     const r = replacementOf.get(id);
@@ -227,7 +241,7 @@ async function resolveNumbers(
         mapping: {
           id: mapping.id,
           part,
-          replacement: part.archivedAt === null ? null : replacement(part.id),
+          replacement: replacement(part.id),
         },
         candidates: [],
       };
@@ -276,16 +290,19 @@ export function supplierRoutes(app: FastifyInstance, deps: PlatformDeps): void {
       const b = request.body;
       const result = await retryOnDuplicate(() =>
         inTenant(deps, request, async (trx, auth) => {
-          const [existing] = await loadSuppliers(trx, { id: b.id });
+          const hash = requestHash({ create: 'supplier', body: b });
+          const existing = await trx
+            .selectFrom('suppliers')
+            .select('request_hash')
+            .where('id', '=', b.id)
+            .executeTakeFirst();
           if (existing !== undefined) {
-            // A retry of the same create returns the supplier; another body is a conflict.
-            const same =
-              existing.name === b.name &&
-              existing.defaultCurrency === (b.defaultCurrency ?? null) &&
-              existing.phone === (b.phone ?? null) &&
-              existing.note === (b.note ?? null);
-            if (!same) throw new ApiError(409, 'idempotency.conflict');
-            return { supplier: existing, created: false };
+            // A retry of the same create returns the supplier as it is now; another request
+            // with this id is a conflict (invariant 5).
+            if (!Buffer.from(existing.request_hash).equals(hash)) {
+              throw new ApiError(409, 'idempotency.conflict');
+            }
+            return { supplier: await loadSupplier(trx, b.id), created: false };
           }
           await assertActiveCurrency(trx, b.defaultCurrency);
           await trx
@@ -297,6 +314,7 @@ export function supplierRoutes(app: FastifyInstance, deps: PlatformDeps): void {
               default_currency: b.defaultCurrency ?? null,
               phone: b.phone ?? null,
               note: b.note ?? null,
+              request_hash: hash,
             })
             .execute();
           const created = await loadSupplier(trx, b.id);
@@ -376,19 +394,19 @@ export function supplierRoutes(app: FastifyInstance, deps: PlatformDeps): void {
         inTenant(deps, request, async (trx, auth) => {
           const supplier = await loadSupplier(trx, supplierId, { lock: true });
           const norm = normalizePartNumber(b.number);
+          const hash = requestHash({ create: 'supplier_part', supplierId, body: b });
           const byId = await trx
             .selectFrom('supplier_parts')
-            .select(['supplier_id', 'part_id', 'number'])
+            .select('request_hash')
             .where('id', '=', b.id)
             .executeTakeFirst();
           if (byId !== undefined) {
-            // A retry of the same request returns the mapping; another body is a conflict.
-            const same =
-              byId.supplier_id === supplierId &&
-              byId.part_id === b.partId &&
-              byId.number === b.number;
-            if (!same) throw new ApiError(409, 'idempotency.conflict');
-            return { mapping: await loadMapping(trx, supplierId, b.id), created: false };
+            // A retry of the same request returns the mapping, even if removed since; another
+            // request with this id is a conflict.
+            if (!Buffer.from(byId.request_hash).equals(hash)) {
+              throw new ApiError(409, 'idempotency.conflict');
+            }
+            return { mapping: await loadMapping(trx, supplierId, b.id, true), created: false };
           }
           const active = await trx
             .selectFrom('supplier_parts')
@@ -419,6 +437,7 @@ export function supplierRoutes(app: FastifyInstance, deps: PlatformDeps): void {
               part_id: b.partId,
               number: b.number,
               created_by: auth.userId,
+              request_hash: hash,
             })
             .execute();
           await audit(

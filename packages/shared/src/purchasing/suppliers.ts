@@ -67,6 +67,8 @@ export const supplierPartSchema = z.object({
   number: z.string(),
   part: partSummarySchema,
   createdAt: timestampSchema,
+  /** Set when the mapping was removed (seen only when a create is replayed). */
+  removedAt: timestampSchema.nullable(),
 });
 export type SupplierPart = z.infer<typeof supplierPartSchema>;
 
@@ -99,8 +101,9 @@ export const resolveSupplierNumbersSchema = z.object({
 
 /**
  * How a supplier number resolves, exact matches only (the system never guesses, ADR 0016):
- * - remembered: this supplier's saved mapping. When that part is archived, `replacement` is
- *   the part that replaces it today (or null), and the mapping should be updated;
+ * - remembered: this supplier's saved mapping. When that part is archived or superseded,
+ *   `replacement` is the part that replaces it today (or null), and the mapping should be
+ *   updated;
  * - candidates: no mapping, but active parts carry this number (catalog number or SKU); the
  *   user picks one, even when there is only one;
  * - none: nothing matches.

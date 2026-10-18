@@ -10,6 +10,9 @@ CREATE TABLE suppliers (
   default_currency text,
   phone            text CHECK (length(phone) <= 40),
   note             text CHECK (length(note) <= 500),
+  -- SHA-256 of the create request: a retry with the same id must send the same request
+  -- (invariant 5), whatever was edited since.
+  request_hash     bytea NOT NULL CHECK (length(request_hash) = 32),
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
   archived_at      timestamptz,
@@ -34,6 +37,7 @@ CREATE TABLE supplier_parts (
   number      text NOT NULL CHECK (length(btrim(number)) BETWEEN 1 AND 60),
   number_norm text GENERATED ALWAYS AS (normalize_part_number(number)) STORED
               CHECK (number_norm <> ''),
+  request_hash bytea NOT NULL CHECK (length(request_hash) = 32),
   created_at  timestamptz NOT NULL DEFAULT now(),
   created_by  uuid NOT NULL,
   removed_at  timestamptz,

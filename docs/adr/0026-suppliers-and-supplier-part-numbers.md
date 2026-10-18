@@ -34,8 +34,8 @@ nothing, and only owners revalue stock.
     part is refused (`supplier_part.taken`) until the old mapping is removed.
   - Archived parts take no new mappings (`catalog.archived`).
 - **Resolving** (`POST /suppliers/:id/resolve`, up to 500 numbers) never guesses (ADR 0016):
-  1. this supplier's active mapping ⇒ `remembered`. When that part is archived, the part
-     that replaces it today is offered as `replacement`.
+  1. this supplier's active mapping ⇒ `remembered`. When that part is archived or
+     superseded, the part that replaces it today is offered as `replacement`.
   2. otherwise, active parts whose catalog number or SKU equals the number ⇒ `candidates`.
      An archived match stands for its current replacement. The user picks one, even when
      only one is offered.
@@ -57,8 +57,10 @@ nothing, and only owners revalue stock.
   - The role lists in `packages/shared/src/auth/permissions.ts` are the reference; ADR 0009's
     lists predate the inventory and purchasing permissions.
 - **Idempotency.** Creates use client v7 ids:
-  - The same request again returns the record (200).
-  - The same id with another body is `idempotency.conflict`.
+  - Suppliers and mappings store the SHA-256 of their create request.
+  - The same request again returns the record as it is now (200), even after an edit or a
+    removal (a removed mapping comes back with `removedAt`).
+  - The same id with another request is `idempotency.conflict`.
   - Concurrent identical requests are retried once on the duplicate key (`retryOnDuplicate`,
     now driven by a list of retryable keys).
 - **Audit:** `supplier.create`, `supplier.update` (before and after),

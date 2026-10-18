@@ -11,6 +11,8 @@ const app = appDb();
 let tenant: string;
 let other: string;
 let user: string;
+/** Any 32 bytes: these tests do not replay creates. */
+const HASH = Buffer.alloc(32);
 
 async function rejects(p: Promise<unknown>): Promise<string | undefined> {
   try {
@@ -33,7 +35,10 @@ async function newPart(tenantId: string): Promise<string> {
 async function newSupplier(tenantId: string, name = `S ${newId().slice(-8)}`): Promise<string> {
   const id = newId();
   await withTenant(app, tenantId, (trx) =>
-    trx.insertInto('suppliers').values({ id, tenant_id: tenantId, name }).execute(),
+    trx
+      .insertInto('suppliers')
+      .values({ id, tenant_id: tenantId, name, request_hash: HASH })
+      .execute(),
   );
   return id;
 }
@@ -49,6 +54,7 @@ function mapNumber(supplierId: string, partId: string, number: string, id = newI
         part_id: partId,
         number,
         created_by: user,
+        request_hash: HASH,
       })
       .execute(),
   );
@@ -86,7 +92,13 @@ describe('suppliers', () => {
       withTenant(app, tenant, (trx) =>
         trx
           .insertInto('suppliers')
-          .values({ id: newId(), tenant_id: tenant, name: 'Money', default_currency: 'ZZZ' })
+          .values({
+            id: newId(),
+            tenant_id: tenant,
+            name: 'Money',
+            default_currency: 'ZZZ',
+            request_hash: HASH,
+          })
           .execute(),
       ),
     );

@@ -410,6 +410,7 @@ export interface SupplierParts {
   part_id: string;
   removed_at: Timestamp | null;
   removed_by: string | null;
+  request_hash: Buffer;
   supplier_id: string;
   tenant_id: string;
 }
@@ -422,6 +423,7 @@ export interface Suppliers {
   name: string;
   note: string | null;
   phone: string | null;
+  request_hash: Buffer;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
 }

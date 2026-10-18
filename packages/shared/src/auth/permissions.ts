@@ -27,7 +27,8 @@ export const PERMISSIONS = [
   'stock.approve_count',
   'stock.review',
   'stock.opening',
-  // Purchasing (Sprint 5). Every purchasing screen also needs cost.view (ADR 0026).
+  // Purchasing (Sprint 5). Screens that show purchase values (receipts) also need cost.view;
+  // supplier master data does not (ADR 0026).
   'purchases.view',
   'purchases.manage',
   'purchases.post',
