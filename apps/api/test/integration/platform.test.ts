@@ -65,6 +65,9 @@ describe('users and roles', () => {
     expect((await sara.get('/auth/me')).json<MeResponse>().permissions).toEqual([
       'audit.read',
       'cost.view',
+      'purchases.manage',
+      'purchases.post',
+      'purchases.view',
       'sessions.manage',
       'stock.adjust',
       'stock.approve_count',

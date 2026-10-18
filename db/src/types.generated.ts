@@ -401,6 +401,33 @@ export interface Supersessions {
   tenant_id: string;
 }
 
+export interface SupplierParts {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: string;
+  number: string;
+  number_norm: Generated<string | null>;
+  part_id: string;
+  removed_at: Timestamp | null;
+  removed_by: string | null;
+  request_hash: Buffer;
+  supplier_id: string;
+  tenant_id: string;
+}
+
+export interface Suppliers {
+  archived_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  default_currency: string | null;
+  id: string;
+  name: string;
+  note: string | null;
+  phone: string | null;
+  request_hash: Buffer;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface TenantCurrencies {
   cash_increment: Numeric | null;
   code: string;
@@ -520,6 +547,8 @@ export interface DB {
   stock_moves: StockMoves;
   stock_review_items: StockReviewItems;
   supersessions: Supersessions;
+  supplier_parts: SupplierParts;
+  suppliers: Suppliers;
   tenant_currencies: TenantCurrencies;
   tenant_directory: TenantDirectory;
   tenants: Tenants;

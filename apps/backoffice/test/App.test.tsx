@@ -116,7 +116,7 @@ describe('shell and permissions', () => {
     new FakeApi().on('GET /auth/me', { status: 200, body: me(ALL) }).install();
     await renderApp('/');
     const nav = await screen.findByRole('navigation', { name: ar.nav.menu });
-    expect(within(nav).getAllByRole('link')).toHaveLength(19);
+    expect(within(nav).getAllByRole('link')).toHaveLength(20);
   });
 
   it('signs out to the login page, and the next user starts at home', async () => {
@@ -319,6 +319,7 @@ describe('every page renders in both languages', () => {
     ['/inventory/counts', (l) => l.count.title],
     [`/inventory/counts/${count.id}`, (l) => l.count.titleAt.replace('{{location}}', 'المحل')],
     ['/inventory/review', (l) => l.review.title],
+    ['/purchasing/suppliers', (l) => l.suppliers.title],
   ];
   // Any "namespace.key" text is a leaked translation key.
   const leakedKey = new RegExp(`\\b(${Object.keys(ar).join('|')})\\.[a-zA-Z_]+`);
@@ -352,6 +353,7 @@ describe('every page renders in both languages', () => {
         .on(`GET /stock/opening/${draft.id}`, ok(draft))
         .on(`GET /stock/opening/${draft.id}/lines`, ok([]))
         .on('GET /stock/review-items', ok([]))
+        .on('GET /suppliers', ok([]))
         .install();
       const { container } = await renderApp(route, lng);
       await screen.findByRole('heading', { name: heading(lng === 'ar' ? ar : en) });

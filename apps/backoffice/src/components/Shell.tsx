@@ -42,6 +42,7 @@ const NAV: NavItem[] = [
     permissions: ['stock.opening', 'cost.view'],
   },
   { to: '/inventory/review', label: 'nav.review', permissions: ['stock.review'] },
+  { to: '/purchasing/suppliers', label: 'nav.suppliers', permissions: ['purchases.view'] },
   { to: '/locations', label: 'nav.locations' },
   { to: '/fx-rates', label: 'nav.fxRates' },
   { to: '/users', label: 'nav.users', permissions: ['users.manage'] },

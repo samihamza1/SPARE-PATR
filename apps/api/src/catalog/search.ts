@@ -336,7 +336,7 @@ async function numberMatches(trx: Trx, numbers: NumberCandidate[]) {
  * The part that replaces each given part today: follow active supersessions to the last
  * part of the chain that is not archived (A -> B archived -> C offers C).
  */
-async function currentReplacements(trx: Trx, ids: string[]): Promise<Map<string, string>> {
+export async function currentReplacements(trx: Trx, ids: string[]): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
   const { rows } = await sql<{ base: string; part: string }>`
     WITH RECURSIVE chain AS (

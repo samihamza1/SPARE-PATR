@@ -198,10 +198,13 @@ export function VehiclePicker({
 export function PartPicker({
   label,
   exclude,
+  error,
   onPick,
 }: {
   label: string;
   exclude?: string;
+  /** A validation message, announced and shown under the field. */
+  error?: string | undefined;
   onPick: (part: PartSummary) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -217,6 +220,7 @@ export function PartPicker({
   return (
     <Select
       label={label}
+      error={error}
       placeholder={t('catalog.choosePart')}
       searchable
       searchValue={search}

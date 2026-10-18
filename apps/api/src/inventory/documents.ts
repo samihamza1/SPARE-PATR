@@ -145,15 +145,24 @@ export async function postOnce(
   return loadStockDocument(trx, doc.id, auth);
 }
 
-/** True when a pg error is the duplicate-key race on a client-chosen document id. */
+/**
+ * Keys two identical requests can race on: client-chosen ids of documents and master
+ * records, and the one active supplier number per supplier. Add each new table whose id
+ * the client chooses, or a concurrent retry surfaces as resource.conflict.
+ */
+const RETRYABLE_KEYS = new Set([
+  'stock_documents_pkey',
+  'stock_counts_pkey',
+  'opening_stock_drafts_pkey',
+  'suppliers_pkey',
+  'supplier_parts_pkey',
+  'supplier_parts_active_key',
+]);
+
+/** True when a pg error is the duplicate-key race on a client-chosen id (or such a key). */
 export function isDuplicateDocument(error: unknown): boolean {
   const e = error as { code?: unknown; constraint?: unknown };
-  return (
-    e.code === '23505' &&
-    ['stock_documents_pkey', 'stock_counts_pkey', 'opening_stock_drafts_pkey'].includes(
-      String(e.constraint),
-    )
-  );
+  return e.code === '23505' && RETRYABLE_KEYS.has(String(e.constraint));
 }
 
 /**

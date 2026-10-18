@@ -29,9 +29,9 @@ import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { z } from 'zod';
 import { audit } from '../../audit';
-import type { AuthContext } from '../../auth/context';
 import type { PlatformDeps } from '../../auth/plugin';
-import { ApiError, forbidden, notFound } from '../../errors';
+import { ApiError, notFound } from '../../errors';
+import { requireCostView } from '../../inventory/cost-view';
 import { loadStockDocument, postOnce, retryOnDuplicate } from '../../inventory/documents';
 import type { StockOp } from '../../inventory/engine';
 import type { RecordedRate } from '../../inventory/fx';
@@ -40,11 +40,6 @@ import type { MoneyContext } from '../../tenant-settings';
 import { readMoneySettings } from '../../tenant-settings';
 import type { Trx } from '../common';
 import { actorOf, inTenant } from '../common';
-
-/** Opening stock shows and enters costs, so it needs cost.view too (ADR 0024). */
-function requireCostView(auth: AuthContext): void {
-  if (!auth.permissions.has('cost.view')) throw forbidden();
-}
 
 const lineParamsSchema = z.object({ id: uuidSchema, partId: uuidSchema });
 
