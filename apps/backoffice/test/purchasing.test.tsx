@@ -66,6 +66,7 @@ describe('suppliers (ADR 0026)', () => {
           number: 'GP-0042',
           part: part(1, 'FLT-100', 'oem', 'فلتر'),
           createdAt: '2026-10-16T08:00:00.000Z',
+          removedAt: null,
         },
       ],
     };
@@ -134,6 +135,34 @@ describe('suppliers (ADR 0026)', () => {
         partId: filter.id,
         number: 'GP-0042',
       });
+    });
+  });
+
+  it('edits only what changed, and saving no change sends nothing', async () => {
+    const api = new FakeApi()
+      .on('GET /auth/me', ok(me(['purchases.view', 'purchases.manage'])))
+      .on('GET /currencies', ok([...CURRENCIES, BBB]))
+      .on('GET /suppliers', ok([{ ...gulf, phone: '111' }]))
+      .on(`PATCH /suppliers/${gulf.id}`, ok({ ...gulf, name: 'Gulf Parts LLC' }));
+    api.install();
+    await renderApp('/purchasing/suppliers');
+    const row = (await screen.findByText('Gulf Parts')).closest('tr')!;
+    fireEvent.click(within(row).getByRole('button', { name: ar.suppliers.edit }));
+    let dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: ar.common.save }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(api.calls.filter((c) => c.method === 'PATCH')).toEqual([]);
+
+    fireEvent.click(within(row).getByRole('button', { name: ar.suppliers.edit }));
+    dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByRole('textbox', { name: new RegExp(ar.suppliers.name) }), {
+      target: { value: 'Gulf Parts LLC' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: ar.common.save }));
+    await waitFor(() => {
+      expect(api.calls.find((c) => c.method === 'PATCH')?.body).toEqual({ name: 'Gulf Parts LLC' });
     });
   });
 });

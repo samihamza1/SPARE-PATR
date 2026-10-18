@@ -1012,6 +1012,7 @@
     "status": "Status",
     "showArchived": "Show archived suppliers",
     "none": "No suppliers yet.",
+    "noMatches": "No supplier matches this search.",
     "numbers": "Part numbers",
     "numbersOf": "Part numbers of {{name}}",
     "numbersIntro": "The numbers printed on this supplier's invoices, each pointing to one part of your catalog.",

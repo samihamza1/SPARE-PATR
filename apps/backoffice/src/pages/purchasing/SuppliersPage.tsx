@@ -51,6 +51,14 @@ const fieldsOf = (s: Supplier): SupplierFields => ({
 /** Blank optional text is sent as null: "no phone", not an empty one. */
 const orNull = (s: string) => (s.trim() === '' ? null : s.trim());
 
+/** The request fields for a supplier form. */
+const bodyOf = (f: SupplierFields) => ({
+  name: f.name.trim(),
+  defaultCurrency: f.defaultCurrency,
+  phone: orNull(f.phone),
+  note: orNull(f.note),
+});
+
 /** Name, default currency, phone and note of a supplier. */
 function SupplierForm({
   value,
@@ -156,7 +164,8 @@ function SupplierPartsDrawer({ supplier, onClose }: { supplier: Supplier; onClos
     <Drawer
       opened
       onClose={onClose}
-      position={i18n.dir() === 'rtl' ? 'left' : 'right'}
+      // Logical side: Mantine mirrors it in Arabic (the end edge in both languages).
+      position="right"
       size="lg"
       title={t('suppliers.numbersOf', { name: supplier.name })}
     >
@@ -182,15 +191,14 @@ function SupplierPartsDrawer({ supplier, onClose }: { supplier: Supplier; onClos
                   setNumber(e.currentTarget.value);
                 }}
               />
-              <PartPicker label={t('suppliers.part')} onPick={setPart} />
+              <PartPicker
+                label={t('suppliers.part')}
+                error={required.errors.part}
+                onPick={setPart}
+              />
               {part !== null && (
                 <Text size="sm">
                   {t('catalog.partOption', { sku: part.sku, name: partName(part, i18n.language) })}
-                </Text>
-              )}
-              {required.errors.part !== undefined && (
-                <Text c="red" size="sm">
-                  {required.errors.part}
                 </Text>
               )}
               <Group>
@@ -255,7 +263,7 @@ function SupplierPartsDrawer({ supplier, onClose }: { supplier: Supplier; onClos
           </Table.Tbody>
         </Table>
         {mappings.data !== undefined && total === 0 && (
-          <Text c="dimmed">{t('suppliers.noNumbers')}</Text>
+          <Text c="dimmed">{q === '' ? t('suppliers.noNumbers') : t('suppliers.noMatches')}</Text>
         )}
         <Pager
           hasPrevious={offset > 0}
@@ -301,10 +309,7 @@ export function SuppliersPage() {
     mutationFn: () =>
       api<Supplier>('POST', '/suppliers', {
         id: newId(),
-        name: fields.name.trim(),
-        defaultCurrency: fields.defaultCurrency,
-        phone: orNull(fields.phone),
-        note: orNull(fields.note),
+        ...bodyOf(fields),
       }),
     onSuccess: async () => {
       setFields(emptyFields);
@@ -319,6 +324,12 @@ export function SuppliersPage() {
       setEditing(null);
       await refresh();
     },
+  });
+  // Archiving has its own state, so it never closes or clears the edit dialog.
+  const archive = useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) =>
+      api<Supplier>('PATCH', `/suppliers/${id}`, { archived }),
+    onSuccess: refresh,
   });
 
   return (
@@ -343,9 +354,7 @@ export function SuppliersPage() {
         </Form>
       )}
       {/* An edit's error shows in its dialog. */}
-      <ErrorAlert
-        error={suppliers.error ?? create.error ?? (editing === null ? update.error : null)}
-      />
+      <ErrorAlert error={suppliers.error ?? create.error ?? archive.error} />
       <Group align="flex-end">
         <TextInput
           label={t('common.search')}
@@ -411,13 +420,16 @@ export function SuppliersPage() {
                       size="xs"
                       variant="light"
                       color={s.archivedAt === null ? 'red' : 'gray'}
+                      loading={archive.isPending && archive.variables.id === s.id}
+                      disabled={archive.isPending}
                       onClick={() => {
-                        const archive = s.archivedAt === null;
+                        if (archive.isPending) return;
+                        const archived = s.archivedAt === null;
                         if (
-                          !archive ||
+                          !archived ||
                           window.confirm(t('suppliers.archiveConfirm', { name: s.name }))
                         )
-                          update.mutate({ id: s.id, body: { archived: archive } });
+                          archive.mutate({ id: s.id, archived });
                       }}
                     >
                       {s.archivedAt === null ? t('suppliers.archive') : t('suppliers.restore')}
@@ -429,7 +441,9 @@ export function SuppliersPage() {
           ))}
         </Table.Tbody>
       </Table>
-      {suppliers.data?.length === 0 && <Text c="dimmed">{t('suppliers.none')}</Text>}
+      {suppliers.data?.length === 0 && (
+        <Text c="dimmed">{q === '' ? t('suppliers.none') : t('suppliers.noMatches')}</Text>
+      )}
       {editing !== null && (
         <Modal
           opened
@@ -442,15 +456,17 @@ export function SuppliersPage() {
           <Form
             onSubmit={() => {
               if (update.isPending || !editRequired.ok()) return;
-              update.mutate({
-                id: editing.id,
-                body: {
-                  name: editFields.name.trim(),
-                  defaultCurrency: editFields.defaultCurrency,
-                  phone: orNull(editFields.phone),
-                  note: orNull(editFields.note),
-                },
-              });
+              // Only what was changed is sent, so a concurrent edit of another field survives.
+              const before = bodyOf(fieldsOf(editing));
+              const after = bodyOf(editFields);
+              const body = Object.fromEntries(
+                Object.entries(after).filter(([k, v]) => before[k as keyof typeof before] !== v),
+              );
+              if (Object.keys(body).length === 0) {
+                setEditing(null);
+                return;
+              }
+              update.mutate({ id: editing.id, body });
             }}
           >
             <Stack>
